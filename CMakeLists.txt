@@ -32,14 +32,12 @@ message(STATUS "${Cyan}OpenCV_INCLUDE_DIRS= ${OpenCV_INCLUDE_DIRS}${ColorReset}"
 
 # Relevant OpenCV's folders
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${PCL_INCLUDE_DIRS})
+#include_directories(${Boost_INCLUDE_DIRS})
 
 # Relevant PLC's folders
-include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
-
-# Relevant BOOST's folders
-include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
+#link_directories(${Boost_LIBRARY_DIRS})
 
 # Set the build type for PCL
 set(PCL_BUILD_TYPE Release)
@@ -144,6 +142,8 @@ catkin_package(
 ## Build ##
 ###########
 
+add_subdirectory(src/descriptor_lib)
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
@@ -156,13 +156,6 @@ file(GLOB lib_folders src/descriptor_lib/*)
 foreach(subfolder ${lib_folders})
 	if (IS_DIRECTORY ${subfolder})
 		include_directories(${subfolder}/include)
-	endif()
-endforeach()
-
-foreach(subfolder ${lib_folders})
-	if (IS_DIRECTORY ${subfolder})
-		message(STATUS "${Blue}Adding subfolder ${subfolder}${ColorReset}")
-		add_subdirectory(${subfolder})
 	endif()
 endforeach()
 
