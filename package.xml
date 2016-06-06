@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>graspping</name>
+  <name>pr2_graspping</name>
   <version>0.0.0</version>
   <description>The graspping package</description>
 

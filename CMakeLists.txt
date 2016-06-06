@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 2.8.3)
-project(graspping)
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+
+# Project's name
+project(pr2_graspping)
 
 # Colors defined for messages
 if(NOT WIN32)
@@ -7,6 +9,7 @@ if(NOT WIN32)
 	set(ColorReset	"${Esc}[m")
 	set(Red 		"${Esc}[31m")
 	set(Green 		"${Esc}[32m")
+	set(Yellow 		"${Esc}[33m")
 	set(Blue 		"${Esc}[34m")
 	set(Magenta 	"${Esc}[35m")
 	set(Cyan 		"${Esc}[36m")
@@ -14,33 +17,46 @@ endif()
 
 
 ## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
 )
 
-## System dependencies are found with CMake's conventions
+## Find other dependencies
 find_package(PCL 1.7 REQUIRED)
 find_package(OpenCV 2.4.8 REQUIRED)
 find_package(yaml-cpp 0.5.2 REQUIRED)
-# find_package(Boost 1.46 COMPONENTS unit_test_framework REQUIRED)
+find_package(Boost 1.46 COMPONENTS unit_test_framework REQUIRED)
+# find_package(OpenMP REQUIRED)
 
-# Print information related to OpenCV version
-message(STATUS "${Cyan}Found OpenCV version ${OpenCV_VERSION}${ColorReset}")
-message(STATUS "${Cyan}OpenCV_INCLUDE_DIRS= ${OpenCV_INCLUDE_DIRS}${ColorReset}")
+# Print information related to libraries
+message(STATUS "${Yellow}PCL found version ${PCL_VERSION}${ColorReset}")
+message(STATUS "${Cyan}\tPCL_INCLUDE_DIRS = ${PCL_INCLUDE_DIRS}${ColorReset}")
 
-# Relevant OpenCV's folders
+message(STATUS "${Yellow}Found OpenCV version ${OpenCV_VERSION}${ColorReset}")
+message(STATUS "${Cyan}\tOpenCV_INCLUDE_DIRS = ${OpenCV_INCLUDE_DIRS}${ColorReset}")
+
+message(STATUS "${Yellow}Found yaml-cpp version ${yaml-cpp_VERSION}${ColorReset}")
+message(STATUS "${Cyan}\tYAML_CPP_INCLUDE_DIR = ${YAML_CPP_INCLUDE_DIR}${ColorReset}")
+
+message(STATUS "${Yellow}Found Boost version ${Boost_LIB_VERSION}${ColorReset}")
+message(STATUS "${Cyan}\tBoost_INCLUDE_DIRS = ${Boost_INCLUDE_DIRS}${ColorReset}")
+
+# Add relevant include directories
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
-#include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${YAML_CPP_INCLUDE_DIR})
 
-# Relevant PLC's folders
+# Add relevant linking directories
 link_directories(${PCL_LIBRARY_DIRS})
-#link_directories(${Boost_LIBRARY_DIRS})
+link_directories(${Boost_LIBRARY_DIRS})
 
 # Set the build type for PCL
 set(PCL_BUILD_TYPE Release)
+
+# Set OpenMP flags to be used
+# set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 # Add extra required definitions
 add_definitions(${PCL_DEFINITIONS})
@@ -142,6 +158,7 @@ catkin_package(
 ## Build ##
 ###########
 
+# Add the directory of the descriptor's libraries
 add_subdirectory(src/descriptor_lib)
 
 ## Specify additional locations of header files
@@ -151,11 +168,14 @@ include_directories(
 	${catkin_INCLUDE_DIRS}
 )
 
-# Add include folders from the 
-file(GLOB lib_folders src/descriptor_lib/*)
-foreach(subfolder ${lib_folders})
-	if (IS_DIRECTORY ${subfolder})
-		include_directories(${subfolder}/include)
+# Add the include directories of the descriptor's libraries
+file(GLOB lib_directories src/descriptor_lib/*)
+list(REMOVE_ITEM lib_directories
+	${CMAKE_CURRENT_SOURCE_DIR}/descriptor_lib/.git
+	${CMAKE_CURRENT_SOURCE_DIR}/descriptor_lib/test)
+foreach(subdir ${lib_directories})
+	if (IS_DIRECTORY ${subdir})
+		include_directories(${subdir}/include)
 	endif()
 endforeach()
 
@@ -180,62 +200,18 @@ add_executable(graspping_test_node src/Grasping_test_node.cpp)
 # target_link_libraries(graspping_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(graspping_test_node
-			clustering
-			descriptor
-			factories
-			io
-			metrics
-			utils
-			${PCL_LIBRARIES}
-			${YAML_CPP_LIBRARIES}
-			${OpenCV_LIBS}
-)
 
-#############
-## Install ##
-#############
+# Set the linking dependencies for all the applications
+set(APPS_LINKING_DEPENDENCIES
+	clustering
+	descriptor
+	factories
+	io
+	metrics
+	utils
+	${PCL_LIBRARIES}
+	${YAML_CPP_LIBRARIES}
+	${OpenCV_LIBS})
 
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
-
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark executables and/or libraries for installation
-# install(TARGETS graspping graspping_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
-
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
-
-#############
-## Testing ##
-#############
-
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_graspping.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
-
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
+# Target grasping node
+target_link_libraries(graspping_test_node ${APPS_LINKING_DEPENDENCIES})
