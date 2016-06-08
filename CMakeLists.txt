@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 # Project's name
-project(pr2_graspping)
+project(pr2_grasping)
 
 # Colors defined for messages
 if(NOT WIN32)
@@ -178,7 +178,7 @@ endforeach()
 include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executable
-add_executable(graspping_node src/GraspingNode.cpp)
+add_executable(grasping_node src/GraspingNode.cpp)
 
 # Set the linking dependencies for all the applications
 set(APPS_LINKING_DEPENDENCIES
@@ -194,4 +194,4 @@ set(APPS_LINKING_DEPENDENCIES
 	${catkin_LIBRARIES})
 
 # Target grasping node
-target_link_libraries(graspping_node ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(grasping_node ${APPS_LINKING_DEPENDENCIES})

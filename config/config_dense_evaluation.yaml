@@ -1,0 +1,22 @@
+---
+# flag to enable/disable the debug generation
+debug: false
+# radius used for the normal vectors estimation
+normalEstimationRadius: -1
+
+##### descriptor calculation params #####
+descriptor:
+    patchSize: 0.02
+    bandNumber: 8
+    bandWidth: 0.005
+    bidirectional: false
+    useProjection: false
+    sequenceBin: 0.005
+    sequenceStat: mean # mean or median
+
+##### cloud smoothing params #####
+cloudSmoothing:
+    useSmoothing: true
+    sigma: 4
+    radius: 0.005
+...

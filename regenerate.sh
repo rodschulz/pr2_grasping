@@ -12,8 +12,10 @@ rm -rf ./install
 # Configure with cmake
 if [ "$type" == "-r" ] ; then
 	echo "Configuring project for RELEASE"
-	catkin_make -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+	catkin_make --force-cmake -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 else
 	echo "Configuring project for DEBUG"
-	catkin_make -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+	catkin_make --force-cmake -G"Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
 fi
+
+awk -f $(rospack find mk)/eclipse.awk build/.project > build/.project_with_env && mv build/.project_with_env build/.project
