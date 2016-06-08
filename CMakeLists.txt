@@ -19,6 +19,8 @@ endif()
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  std_msgs
+  genmsg
 )
 
 ## Find other dependencies
@@ -150,7 +152,7 @@ add_definitions("-Wall")
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES graspping
-   CATKIN_DEPENDS roscpp
+   CATKIN_DEPENDS roscpp std_msgs
 #  DEPENDS system_lib
 )
 
@@ -161,45 +163,22 @@ catkin_package(
 # Add the directory of the descriptor's libraries
 add_subdirectory(src/descriptor_lib)
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-# include_directories(include)
-include_directories(
-	${catkin_INCLUDE_DIRS}
-)
-
 # Add the include directories of the descriptor's libraries
 file(GLOB lib_directories src/descriptor_lib/*)
 list(REMOVE_ITEM lib_directories
-	${CMAKE_CURRENT_SOURCE_DIR}/descriptor_lib/.git
-	${CMAKE_CURRENT_SOURCE_DIR}/descriptor_lib/test)
+	${CMAKE_CURRENT_SOURCE_DIR}/src/descriptor_lib/.git
+	${CMAKE_CURRENT_SOURCE_DIR}/src/descriptor_lib/test)
 foreach(subdir ${lib_directories})
 	if (IS_DIRECTORY ${subdir})
 		include_directories(${subdir}/include)
 	endif()
 endforeach()
 
-## Declare a C++ library
-# add_library(graspping
-#   src/${PROJECT_NAME}/graspping.cpp
-# )
-
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(graspping ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+## Specify additional locations of header files
+include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executable
-add_executable(graspping_test_node src/Grasping_test_node.cpp)
-
-## Add cmake target dependencies of the executable
-## same as for the library above
-# add_dependencies(graspping_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-## Specify libraries to link a library or executable target against
-# target_link_libraries(graspping_node
-#   ${catkin_LIBRARIES}
-# )
+add_executable(graspping_node src/GraspingNode.cpp)
 
 # Set the linking dependencies for all the applications
 set(APPS_LINKING_DEPENDENCIES
@@ -211,7 +190,8 @@ set(APPS_LINKING_DEPENDENCIES
 	utils
 	${PCL_LIBRARIES}
 	${YAML_CPP_LIBRARIES}
-	${OpenCV_LIBS})
+	${OpenCV_LIBS}
+	${catkin_LIBRARIES})
 
 # Target grasping node
-target_link_libraries(graspping_test_node ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(graspping_node ${APPS_LINKING_DEPENDENCIES})
