@@ -1,24 +1,24 @@
 <?xml version="1.0"?>
 <package>
-  <name>pr2_grasping</name>
-  <version>0.0.1</version>
-  
-  <description>Package performing descriptor based grasping</description>
+    <name>pr2_grasping</name>
+    <version>0.0.1</version>
+    <description>Package performing descriptor based grasping</description>
 
-  <!-- package metadata -->
-  <maintainer email="rodrigo@fakemail.com">rodrigo</maintainer>
-  <license>GPLv3</license>
-  <url type="website">https://github.com/rodschulz/pr2_grasping</url>
-  <author email="rodrigo@fakemail.com">rodrigo</author>
+    <!-- package metadata -->
+    <maintainer email="rodrigo@fakemail.com">rodrigo</maintainer>
+    <license>GPLv3</license>
+    <url type="website">https://github.com/rodschulz/pr2_grasping</url>
+    <author email="rodrigo@fakemail.com">rodrigo</author>
 
-  <!-- package dependencies -->
-  <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>std_msgs</run_depend>
+    <!-- package dependencies -->
+    <buildtool_depend>catkin</buildtool_depend>
+    
+    <build_depend>roscpp</build_depend>
+    <build_depend>std_msgs</build_depend>
+    
+    <run_depend>roscpp</run_depend>
+    <run_depend>std_msgs</run_depend>
 
-  <!-- The export tag contains other, unspecified, tags -->
-  <export>
-  </export>
+    <!-- The export tag contains other, unspecified, tags -->
+    <export/>
 </package>
