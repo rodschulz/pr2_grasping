@@ -35,7 +35,7 @@ void graspingCallback(const sensor_msgs::PointCloud2ConstPtr &_msg)
 	// Descriptor dense evaluation over the point cloud
 	ROS_INFO("..performing dense evaluation");
 	cv::Mat descriptors;
-	Calculator::calculateDescriptors(cloud, Config::getDescriptorParams(), descriptors);
+//	Calculator::calculateDescriptors(cloud, Config::getDescriptorParams(), descriptors);
 
 	// Perform the cloud segmentation using the descriptors
 }
