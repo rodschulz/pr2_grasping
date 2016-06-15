@@ -19,8 +19,10 @@ endif()
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  rospy
   std_msgs
-  genmsg
+  actionlib
+  pr2_controllers_msgs
 )
 
 ## Find other dependencies
@@ -152,7 +154,7 @@ add_definitions("-Wall")
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES graspping
-   CATKIN_DEPENDS roscpp std_msgs
+   CATKIN_DEPENDS roscpp rospy std_msgs actionlib pr2_controllers_msgs
 #  DEPENDS system_lib
 )
 
@@ -177,10 +179,11 @@ endforeach()
 ## Specify additional locations of header files
 include_directories(${catkin_INCLUDE_DIRS})
 
-## Declare a C++ executable
-add_executable(grasping_node src/GraspingNode.cpp)
+## Declare a C++ executables
+add_executable(grasping_node src/grasping_node.cpp)
+add_executable(setup_arms src/setup_arms.cpp)
 
-# Set the linking dependencies for all the applications
+# Set the linking dependencies for the complex applications
 set(APPS_LINKING_DEPENDENCIES
 	clustering
 	descriptor
@@ -193,5 +196,6 @@ set(APPS_LINKING_DEPENDENCIES
 	${OpenCV_LIBS}
 	${catkin_LIBRARIES})
 
-# Target grasping node
+# Target linking dependencies
 target_link_libraries(grasping_node ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(setup_arms ${catkin_LIBRARIES})
