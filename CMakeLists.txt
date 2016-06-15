@@ -15,14 +15,18 @@ if(NOT WIN32)
 	set(Cyan 		"${Esc}[36m")
 endif()
 
-
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  std_msgs
-  actionlib
-  pr2_controllers_msgs
+	roscpp
+	std_msgs
+	nav_msgs
+	actionlib
+	pr2_controllers_msgs
+	interactive_markers
+	moveit_core
+	moveit_fake_controller_manager
+	moveit_ros_perception
+	moveit_ros_planning_interface
 )
 
 ## Find other dependencies
@@ -145,17 +149,18 @@ add_definitions("-Wall")
 ###################################
 ## catkin specific configuration ##
 ###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if you package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES graspping
-   CATKIN_DEPENDS roscpp rospy std_msgs actionlib pr2_controllers_msgs
-#  DEPENDS system_lib
+	CATKIN_DEPENDS
+		roscpp
+		std_msgs
+		nav_msgs
+		actionlib
+		pr2_controllers_msgs
+		interactive_markers
+		moveit_core
+		moveit_fake_controller_manager
+		moveit_ros_perception
+		moveit_ros_planning_interface
 )
 
 ###########
@@ -181,7 +186,7 @@ include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executables
 add_executable(grasping_node src/grasping_node.cpp)
-add_executable(setup_arms src/setup_arms.cpp)
+add_executable(gazebo_pr2_setup src/gazebo_pr2_setup.cpp)
 
 # Set the linking dependencies for the complex applications
 set(APPS_LINKING_DEPENDENCIES
@@ -198,4 +203,4 @@ set(APPS_LINKING_DEPENDENCIES
 
 # Target linking dependencies
 target_link_libraries(grasping_node ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(setup_arms ${catkin_LIBRARIES})
+target_link_libraries(gazebo_pr2_setup ${catkin_LIBRARIES})
