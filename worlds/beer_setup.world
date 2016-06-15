@@ -11,15 +11,15 @@
 		</include>
 		<!-- A table to hold things -->
 		<include>
-			<uri>model://table</uri>
+			<uri>model://cafe_table</uri>
 			<name>table</name>
-			<pose>3.0 0 0 0 0 1.57079632679</pose>
+			<pose>2.0 0 0 0 0 0</pose>
 		</include>
 		<!-- A table to hold things -->
 		<include>
 			<uri>model://beer</uri>
 			<name>beer</name>
-			<pose>3.0 0 1 0 0 0</pose>
+			<pose>1.75 0 0.77 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->
