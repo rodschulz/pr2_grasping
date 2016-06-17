@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://coke_can</uri>
 			<name>can</name>
-			<pose>1.75 0 0.77 0 0 0</pose>
+			<pose>1.75 0 0.8 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->

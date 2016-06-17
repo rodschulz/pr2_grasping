@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://saucepan</uri>
 			<name>pan</name>
-			<pose>1.55 0.2 0.77 0 0 -1.57079632679</pose>
+			<pose>1.55 0.2 0.8 0 0 -1.57079632679</pose>
 		</include>
 
 		<!-- Shadows disabled -->

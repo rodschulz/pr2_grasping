@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://cinder_block</uri>
 			<name>block</name>
-			<pose>1.9 0 0.77 0 0 0</pose>
+			<pose>1.9 0 0.8 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->
