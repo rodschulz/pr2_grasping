@@ -1,0 +1,7 @@
+<launch>
+	<!-- launch the robot -->
+	<include file="$(find pr2_gazebo)/launch/pr2.launch"/>
+
+	<!-- launch moveit -->
+	<include file="$(find pr2_moveit_config)/launch/move_group.launch"/>
+</launch>
