@@ -1,6 +1,11 @@
 ---
 # flag to enable/disable the debug generation
-debug: false
+nodeDebug: true
+
+# sampling voxel size
+voxelSize: 0.008
+# location of the BoW file
+bowLocation: 'src/grasping/config/bow50.dat'
 # radius used for the normal vectors estimation
 normalEstimationRadius: -1
 
