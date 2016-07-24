@@ -43,8 +43,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &_msg)
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicObjectExtraction(sampled, transformation, debugEnabled);
 
-	static bool done = false;
-	if (!done && debugEnabled)
+	static bool debugDone = false;
+	if (!debugDone && debugEnabled)
 	{
 		pcl::io::savePCDFileASCII("./orig.pcd", *cloudXYZ);
 		pcl::io::savePCDFileASCII("./filtered.pcd", *filtered);
@@ -65,19 +65,24 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &_msg)
 	ROS_INFO("...labeling cloud");
 	svm->predict(descriptors, labels);
 
-	if (!done && debugEnabled)
+	if (!debugDone && debugEnabled)
 		Writer::writeClusteredCloud("./labeled.pcd", cloud, labels);
 
-	done = true;
-	// Perform the cloud segmentation using the descriptors
-//	cv::Mat indices, distances;
-//	cv::flann::Index flannIndex = cv::flann::Index(BoW, cv::flann::KDTreeIndexParams(4));
-//	flannIndex.knnSearch(descriptors, indices, distances, 1);
+	debugDone = true;
+
+
+
+	/**
+	 * 	HERE THE EXTRACTED CLOUD HAS TO BE PUBLISHED AS PointXYZL, WHERE THE LABELS ARE THE CLUSTER NUMBER ACORDING TO
+	 * 	THE LABELING DONE BASED ON THE BOW, SO THE NEXT NODE CAN USE IT FOR THE DBSCAN ALGORITHM
+	 */
+
+
 }
 
 int main(int _argn, char **_argv)
 {
-	ros::init(_argn, _argv, "gazebo_pr2_grasping");
+	ros::init(_argn, _argv, "gazebo_pr2_labeler");
 	ros::NodeHandle nodeHandler;
 	transformationListener = new tf::TransformListener(ros::Duration(10.0));
 
@@ -94,7 +99,10 @@ int main(int _argn, char **_argv)
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
 	// Set the subscription to get the point clouds
-	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 10, cloudCallback);
+	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
+
+	// Set the publisher
+	ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
 	// Keep looping
 	ROS_INFO("Node looping");

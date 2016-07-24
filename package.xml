@@ -3,14 +3,17 @@
     <name>pr2_grasping</name>
     <version>0.0.1</version>
     <description>Package performing descriptor based grasping</description>
+    
     <!-- package metadata -->
     <maintainer email="rodrigo@fakemail.com">rodrigo</maintainer>
     <license>GPLv3</license>
     <url type="website">https://github.com/rodschulz/pr2_grasping</url>
     <author email="rodrigo@fakemail.com">rodrigo</author>
+    
     <!-- package build dependencies -->
     <buildtool_depend>catkin</buildtool_depend>
     <build_depend>roscpp</build_depend>
+    <build_depend>rospy</build_depend>
     <build_depend>std_msgs</build_depend>
     <build_depend>nav_msgs</build_depend>
     <build_depend>actionlib</build_depend>
@@ -20,8 +23,10 @@
     <build_depend>moveit_fake_controller_manager</build_depend>
     <build_depend>moveit_ros_perception</build_depend>
     <build_depend>moveit_ros_planning_interface</build_depend>
+    
     <!-- package run dependencies -->
     <run_depend>roscpp</run_depend>
+    <run_depend>rospy</run_depend>
     <run_depend>std_msgs</run_depend>
     <run_depend>nav_msgs</run_depend>
     <run_depend>actionlib</run_depend>
@@ -31,6 +36,7 @@
     <run_depend>moveit_fake_controller_manager</run_depend>
     <run_depend>moveit_ros_perception</run_depend>
     <run_depend>moveit_ros_planning_interface</run_depend>
+    
     <!-- The export tag contains other, unspecified, tags -->
     <export/>
 </package>

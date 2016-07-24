@@ -21,6 +21,7 @@ endif()
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
 	roscpp
+	rospy
 	std_msgs
 	nav_msgs
 	actionlib
@@ -74,6 +75,7 @@ add_definitions("-Wall")
 catkin_package(
 	CATKIN_DEPENDS
 		roscpp
+		rospy
 		std_msgs
 		nav_msgs
 		actionlib
@@ -109,7 +111,7 @@ include_directories(src/grasping_lib/)
 include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executables
-add_executable(gazebo_pr2_grasping src/gazebo_pr2_grasping.cpp)
+add_executable(gazebo_pr2_labeler src/gazebo_pr2_labeler.cpp)
 add_executable(gazebo_pr2_setup src/gazebo_pr2_setup.cpp)
 
 # Set the linking dependencies for the complex applications
@@ -125,5 +127,5 @@ set(APPS_LINKING_DEPENDENCIES
 	${catkin_LIBRARIES})
 
 # Target linking dependencies
-target_link_libraries(gazebo_pr2_grasping ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(gazebo_pr2_labeler ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(gazebo_pr2_setup ${catkin_LIBRARIES})

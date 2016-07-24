@@ -1,6 +1,6 @@
 ---
 # flag to enable/disable the debug generation
-nodeDebug: true
+nodeDebug: false
 
 # sampling voxel size
 voxelSize: 0.008

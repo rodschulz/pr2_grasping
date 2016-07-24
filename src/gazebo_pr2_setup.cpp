@@ -150,7 +150,7 @@ void moveHead()
 int main(int argc, char** argv)
 {
 	// setup node
-	ros::init(argc, argv, "arms_setup");
+	ros::init(argc, argv, "gazebo_pr2_setup");
 
 	// define publisher and subscriber for the base's movement
 	ros::NodeHandle handler;
