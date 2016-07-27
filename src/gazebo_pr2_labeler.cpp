@@ -44,13 +44,15 @@ pcl::PointCloud<pcl::PointXYZL>::Ptr generateLabeledCloud(const pcl::PointCloud<
 		pcl::PointNormal p = cloud_->at(index);
 		labeledCloud->push_back(PointFactory::createPointXYZL(p.x, p.y, p.z, label));
 
-		if (lastLabel != label)
+		if (debug_ && lastLabel != label)
 		{
 			ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
 			lastLabel = label;
 			lastLabelIndex = i;
 		}
 	}
+	if (debug_)
+		ROS_INFO(".....label %d, %zu pts", lastLabel, cloud_->size() - lastLabelIndex);
 
 	return labeledCloud;
 }
@@ -111,7 +113,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 //	output.header.stamp = ros::Time::now();
 //	output.header.frame_id = FRAME_KINNECT;
 
-	// Write debug data
+// Write debug data
 	if (!debugDone && debugEnabled)
 	{
 		Writer::writeClusteredCloud("./clustered.pcd", cloud, labels);
@@ -143,7 +145,7 @@ int main(int _argn, char **_argv)
 	pub = nodeHandler.advertise<pcl::PointCloud<pcl::PointXYZL> >("/pr2_grasping/labeled_cloud", 1);
 //	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
-	// Set the subscription to get the point clouds
+// Set the subscription to get the point clouds
 	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
 
 	// Keep looping
