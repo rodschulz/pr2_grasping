@@ -3,6 +3,9 @@
  * 2016
  */
 #include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include "Config.hpp"
 #include "Loader.hpp"
@@ -16,19 +19,53 @@
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_link"
 
+//Global variables
 tf::TransformListener *transformationListener;
+ros::Publisher pub;
 CvSVMPtr svm;
 
-void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &_msg)
+// Method that generates a labeled cloud ready to be published
+pcl::PointCloud<pcl::PointXYZL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_, const cv::Mat &labels_, const bool debug_ = false)
+{
+	pcl::PointCloud<pcl::PointXYZL>::Ptr labeledCloud = pcl::PointCloud<pcl::PointXYZL>::Ptr(new pcl::PointCloud<pcl::PointXYZL>());
+
+	// Get the indices of the sorted data according to the labels
+	cv::Mat indices;
+	cv::sortIdx(labels_, indices, cv::SORT_EVERY_COLUMN + cv::SORT_ASCENDING);
+
+	// Generate the output cloud
+	int lastLabel = labels_.at<float>(indices.at<int>(0));
+	int lastLabelIndex = 0;
+	for (size_t i = 0; i < cloud_->size(); i++)
+	{
+		int index = indices.at<int>(i);
+		int label = labels_.at<float>(index);
+
+		pcl::PointNormal p = cloud_->at(index);
+		labeledCloud->push_back(PointFactory::createPointXYZL(p.x, p.y, p.z, label));
+
+		if (lastLabel != label)
+		{
+			ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
+			lastLabel = label;
+			lastLabelIndex = i;
+		}
+	}
+
+	return labeledCloud;
+}
+
+// Callback called when a new pointcloud received from the sensor
+void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 {
 	ROS_INFO("Cloud received");
 
-	static bool debugEnabled = Config::get()["nodeDebug"].as<bool>();
+	static bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
 	static float voxelSize = Config::get()["voxelSize"].as<float>();
 
 	// Convert cloud to PCL format
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ(new pcl::PointCloud<pcl::PointXYZ>());
-	pcl::fromROSMsg(*_msg, *cloudXYZ);
+	pcl::fromROSMsg(*msg_, *cloudXYZ);
 
 	// Get the required transformation
 	tf::StampedTransform transformation;
@@ -65,19 +102,23 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &_msg)
 	ROS_INFO("...labeling cloud");
 	svm->predict(descriptors, labels);
 
+	// Publish the extrated and labeled cloud
+	pcl::PointCloud<pcl::PointXYZL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
+	pub.publish(labeledCloud);
+
+//	sensor_msgs::PointCloud2 output;
+//	pcl::toROSMsg<pcl::PointXYZL>(*labeledCloud, output);
+//	output.header.stamp = ros::Time::now();
+//	output.header.frame_id = FRAME_KINNECT;
+
+	// Write debug data
 	if (!debugDone && debugEnabled)
-		Writer::writeClusteredCloud("./labeled.pcd", cloud, labels);
+	{
+		Writer::writeClusteredCloud("./clustered.pcd", cloud, labels);
+		pcl::io::savePCDFileASCII("./labeled.pcd", *labeledCloud);
+	}
 
 	debugDone = true;
-
-
-
-	/**
-	 * 	HERE THE EXTRACTED CLOUD HAS TO BE PUBLISHED AS PointXYZL, WHERE THE LABELS ARE THE CLUSTER NUMBER ACORDING TO
-	 * 	THE LABELING DONE BASED ON THE BOW, SO THE NEXT NODE CAN USE IT FOR THE DBSCAN ALGORITHM
-	 */
-
-
 }
 
 int main(int _argn, char **_argv)
@@ -98,11 +139,12 @@ int main(int _argn, char **_argv)
 	Loader::loadMatrix(Config::get()["bowLocation"].as<std::string>(), BoW, &metadata);
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
+	// Set the publisher
+	pub = nodeHandler.advertise<pcl::PointCloud<pcl::PointXYZL> >("/pr2_grasping/labeled_cloud", 1);
+//	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
+
 	// Set the subscription to get the point clouds
 	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
-
-	// Set the publisher
-	ros::Publisher pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
 	// Keep looping
 	ROS_INFO("Node looping");
