@@ -106,14 +106,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 	// Publish the extrated and labeled cloud
 	pcl::PointCloud<pcl::PointXYZL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
-	pub.publish(labeledCloud);
+	sensor_msgs::PointCloud2 output;
+	pcl::toROSMsg<pcl::PointXYZL>(*labeledCloud, output);
+	output.header.stamp = ros::Time::now();
+	output.header.frame_id = FRAME_KINNECT;
+	pub.publish(output);
 
-//	sensor_msgs::PointCloud2 output;
-//	pcl::toROSMsg<pcl::PointXYZL>(*labeledCloud, output);
-//	output.header.stamp = ros::Time::now();
-//	output.header.frame_id = FRAME_KINNECT;
-
-// Write debug data
+	// Write debug data
 	if (!debugDone && debugEnabled)
 	{
 		Writer::writeClusteredCloud("./clustered.pcd", cloud, labels);
@@ -142,10 +141,9 @@ int main(int _argn, char **_argv)
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
 	// Set the publisher
-	pub = nodeHandler.advertise<pcl::PointCloud<pcl::PointXYZL> >("/pr2_grasping/labeled_cloud", 1);
-//	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
+	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
-// Set the subscription to get the point clouds
+	// Set the subscription to get the point clouds
 	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
 
 	// Keep looping

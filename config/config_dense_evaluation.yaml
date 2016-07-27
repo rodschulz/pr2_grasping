@@ -1,6 +1,7 @@
 ---
-# flag to enable/disable the debug generation
+# flag to enable/disable debug
 labelerDebug: false
+analyzerDebug: false
 
 # sampling voxel size
 voxelSize: 0.005
