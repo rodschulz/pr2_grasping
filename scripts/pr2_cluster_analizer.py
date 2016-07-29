@@ -9,7 +9,7 @@ from sklearn.cluster import DBSCAN
 from sklearn import metrics
 from mpl_toolkits.mplot3d import Axes3D
 
-configLocation = 'src/grasping/config/config_dense_evaluation.yaml'
+configLocation = 'src/grasping/config/config_labeler.yaml'
 debug = False
 
 ##################################################
