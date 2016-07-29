@@ -15,7 +15,7 @@
 #include "GraspingUtils.hpp"
 #include "Writer.hpp"
 
-#define CONFIG_LOCATION		"src/grasping/config/config_labeler.yaml"
+#define CONFIG_LOCATION		"src/grasping/config/config.yaml"
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_link"
 
