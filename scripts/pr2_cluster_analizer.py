@@ -3,51 +3,23 @@ import yaml
 import utils
 import rospy as rp
 import numpy as np
-import matplotlib.pyplot as plt
+from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import MultiArrayDimension
 from sensor_msgs.msg import PointCloud2
 from sklearn.cluster import DBSCAN
 from sklearn import metrics
-from mpl_toolkits.mplot3d import Axes3D
 
+
+# Node configuration file location
 configLocation = 'src/grasping/config/config.yaml'
+# Debug flag 
 debug = False
+# Object for publishing the grasping points 
+publisher = None
 
 
 ##################################################
-def extractDim(data_, dim_=0):
-	extracted = []
-	for d in data_:
-		extracted.append(d[dim_])
-	return extracted
-
-
-##################################################
-def plotData(data_, labels_, index_=-1, nclusters_=-1):
-	fig = plt.figure()
-	ax = fig.add_subplot(111, projection='3d')
-
-	classes = set(labels_)
-	colors = plt.cm.Spectral(np.linspace(0, 1, len(classes)))
-
-	for cls, col in zip(classes, colors):
-		if cls == -1:
-			col = 'k'
-
-		dclass = data_[labels_ == cls]
-		xclass = extractDim(dclass, 0)
-		yclass = extractDim(dclass, 1)
-		zclass = extractDim(dclass, 2)
-		ax.scatter(xclass, yclass, zclass, c=col, s=20, linewidth='0', alpha=1.0)
-		title = 'label' + str(index_)
-		ax.set_title(title + ' (' + str(len(data_)) +' pts - ' + str(nclusters_) + ' clusters)')
-		ax.view_init(elev=30, azim=-15)
-
-	plt.savefig(title + '.png')
-	# plt.show()
-
-
-##################################################
-def synthetizeGraspingPoint(data_, labels_, index_):
+def synthesizeGraspingPoints(data_, labels_, index_):
 	points = []
 
 	classes = set(labels_)
@@ -61,7 +33,10 @@ def synthetizeGraspingPoint(data_, labels_, index_):
 
 		rp.loginfo('.......cluster size: %d pts', len(pts))
 		p = np.average(pts, axis=0)
-		points.append([p, index_])
+
+		# Concatenate the new grasping point and its label
+		points = points + p.tolist()
+		points.append(index_)
 
 	return points
 
@@ -71,38 +46,54 @@ def analyze(data_):
 	rp.loginfo('Cloud received')
 
 	# Extract data
-	clouds, pts = utils.extractLabeledCloud(data_)
-	rp.loginfo('Retrieved %d pts', pts)
+	clouds, npoints = utils.extractLabeledCloud(data_)
+	rp.loginfo('Retrieved %d pts', npoints)
 
 	# Compute DBSCAN
-	minDataSize = 0.1 * pts
+	graspPoints = []
+	minDataSize = 0.1 * npoints
 	for key in clouds:
 		if len(clouds[key]) < minDataSize:
 			continue
 
-		points = np.array(clouds[key])
+		# Get the actual data from the cloud
+		cloudData = np.array(clouds[key])
 
-		db = DBSCAN(eps=0.02, min_samples=20).fit(points)
+		db = DBSCAN(eps=0.02, min_samples=20).fit(cloudData)
 		nclusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
-		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(points), nclusters)
-		rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(points, db.labels_))
+		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(cloudData), nclusters)
+		rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
 
+		# Synthesize the grasping points
 		if nclusters > 0:
-			graspPts = synthetizeGraspingPoint(data_=points, labels_=db.labels_, index_=key)
+			graspPoints = graspPoints + synthesizeGraspingPoints(data_=cloudData, labels_=db.labels_, index_=key)
 
 			# Generate debug data if requested
 			if debug:
-				plotData(data_=points, labels_=db.labels_, index_=key, nclusters_=nclusters)
+				utils.plotData3D(data_=cloudData, labels_=db.labels_, index_=key, nclusters_=nclusters)
 
 	rp.loginfo('...finished')
+
+	# Publish the synthesized grasping points
+	dims = 4
+	npts = len(graspPoints) / dims;
+	msg = Float32MultiArray()
+	msg.layout.dim.append(MultiArrayDimension('len', npts, dims))
+	msg.layout.dim.append(MultiArrayDimension('coords', dims, 1))
+	msg.data = graspPoints
+	publisher.publish(msg)
 
 
 ##################################################
 if __name__ == '__main__':
 	try:
+		# Load config file
 		with open(configLocation, 'r') as f:
 			config = yaml.load(f)
 			debug = config['analyzerDebug']
+
+		# Initialize published topic
+		publisher = rp.Publisher('/pr2_grasping/grasping_points', Float32MultiArray, queue_size=2)
 
 		# Setup node name
 		rp.init_node('pr2_cluster_analizer', anonymous=False)
@@ -117,4 +108,5 @@ if __name__ == '__main__':
 		print('Unable to read config file')
 
 	except rp.ROSInterruptException as e:
+		print('Node interrupted: ' + str(e))
 		pass
