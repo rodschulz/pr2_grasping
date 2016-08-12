@@ -147,7 +147,7 @@ int main(int _argn, char **_argv)
 	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
 
 	// Keep looping
-	ROS_INFO("Node looping");
+	ROS_INFO("Labeler node looping");
 	ros::spin();
 
 	return EXIT_SUCCESS;
