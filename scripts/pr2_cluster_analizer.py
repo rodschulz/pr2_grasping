@@ -62,10 +62,10 @@ def analyze(data_):
 		db = DBSCAN(eps=0.02, min_samples=20).fit(cloudData)
 		nclusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
 		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(cloudData), nclusters)
-		rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
 
 		# Synthesize the grasping points
 		if nclusters > 0:
+			rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
 			graspPoints = graspPoints + synthesizeGraspingPoints(data_=cloudData, labels_=db.labels_, index_=key)
 
 			# Generate debug data if requested
