@@ -7,84 +7,106 @@
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <boost/signals2/mutex.hpp>
-#include <queue>
+#include <deque>
 
 // Pointer to a move group interface
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 
+// Structure to store a grasping point
+struct GraspPt
+{
+	float x;
+	float y;
+	float z;
+	int label;
+
+	GraspPt(const float x_, const float y_, const float z_, const int label_)
+	{
+		x = x_;
+		y = y_;
+		z = z_;
+		label = label_;
+	}
+};
+
 // Queue of grasping points
-std::queue<int> pointsQueue;
+std::deque<GraspPt> ptsQueue;
 // Mutex for concurrent access to the queue
 boost::mutex mutex;
 // Manipulation group
 MoveGroupPtr rightArm;
 
-
 void graspingPointsCallback(const std_msgs::Float32MultiArrayConstPtr &msg_)
 {
 	ROS_INFO("Points received");
-//
-//	int npoints = msg_->layout.dim[0].size;
-//	int step = msg_->layout.dim[0].stride;
 
-	static int kk = 0;
+	// Prevent queue from growing too much
+	if (ptsQueue.size() <= 20)
+	{
+		int npoints = msg_->layout.dim[0].size;
+		int step = msg_->layout.dim[0].stride;
 
-
-	mutex.lock();
-	pointsQueue.push(kk++);
-	mutex.unlock();
-
-//	use average normal direction to set the gripper orientation???
-
-
-
-
-
-
-//	// right arm pose
-//	geometry_msgs::Pose rightArmPose;
-//	rightArmPose.orientation.w = 1.0;
-//	rightArmPose.position.x = 0.3;
-//	rightArmPose.position.y = -0.5;
-//	rightArmPose.position.z = 1.4;
-//
-//	// left arm pose
-//	geometry_msgs::Pose leftArmPose;
-//	leftArmPose.orientation.w = 1.0;
-//	leftArmPose.position.x = 0.3;
-//	leftArmPose.position.y = 0.5;
-//	leftArmPose.position.z = 1.4;
-//
-//	// set the pose for each arm
-//	armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
-//	armsGroup.setPoseTarget(leftArmPose, "l_wrist_roll_link");
-//
-//	// plan the trajectory
-//	moveit::planning_interface::MoveGroup::Plan armsPlan;
-//	ROS_INFO("...planing arms trajectory");
-//	bool planningOk = armsGroup.plan(armsPlan);
-//	ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
-//
-//	// move the arms
-//	if (planningOk)
-//	{
-//		ROS_INFO("...moving arms");
-//		armsGroup.move();
-//	}
-//
-//	ROS_INFO("...arms movement completed");
+		for (int i = 0; i < npoints; i++)
+		{
+			int index = i * step;\
+			// Add the new point to the queue
+			mutex.lock();
+			ptsQueue.push_back(GraspPt(msg_->data[index], msg_->data[index + 1], msg_->data[index + 2], msg_->data[index + 3]));
+			mutex.unlock();
+		}
+	}
+	else
+		ROS_INFO("Queue full, discarding...");
 }
 
 void timerCallback(const ros::TimerEvent& event)
 {
-	while(!pointsQueue.empty())
+	while (!ptsQueue.empty())
 	{
+		ROS_INFO("...processing point (%.3f, %.3f, %.3f, %d)", ptsQueue.front().x, ptsQueue.front().y, ptsQueue.front().z, ptsQueue.front().label);
+
+		rightArm->setPoseReferenceFrame("head_mount_kinect_ir_optical_frame");
+//		rightArm->setPoseReferenceFrame("base_link");
+
+		ROS_INFO("...ref frame: %s", rightArm->getPlanningFrame().c_str());
+		ROS_INFO("...efector: %s - efector link: %s", rightArm->getEndEffector().c_str(), rightArm->getEndEffectorLink().c_str());
+
+
+
+		// right arm pose
+		geometry_msgs::Pose armPose;
+		armPose.orientation.w = 1.0;
+		armPose.position.x = ptsQueue.front().x;
+		armPose.position.y = ptsQueue.front().y;
+		armPose.position.z = ptsQueue.front().z;
+//		armPose.position.x = 0.75;
+//		armPose.position.y = 0;
+//		armPose.position.z = 0.77;
+
+		// Pop a point from the queue
 		mutex.lock();
-
-		ROS_INFO("Popping stuff!");
-		pointsQueue.pop();
-
+		ptsQueue.pop_front();
 		mutex.unlock();
+
+		// Set arm's pose
+//		rightArm->setPoseTarget(armPose, "r_wrist_roll_link");
+		rightArm->setPoseTarget(armPose);
+//		rightArm->setPoseTarget(armPose, "r_gripper_l_finger_link");
+
+		// Plan the trajectory
+		moveit::planning_interface::MoveGroup::Plan armPlan;
+		ROS_INFO("...planing arm trajectory");
+		bool planningOk = rightArm->plan(armPlan);
+		ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
+
+		// Move the arm
+		if (planningOk)
+		{
+			ROS_INFO("...moving right arm");
+			rightArm->move();
+		}
+
+		ROS_INFO("...arm movement completed");
 	}
 }
 
@@ -94,10 +116,12 @@ int main(int _argn, char **_argv)
 	ros::NodeHandle nodeHandler;
 
 	// group to plane movement for both arms
-	ROS_INFO("Seting up arms control");
+	ROS_INFO("Setting right arm control");
 	rightArm = MoveGroupPtr(new moveit::planning_interface::MoveGroup("right_arm"));
+//	rightArm = MoveGroupPtr(new moveit::planning_interface::MoveGroup("right_eef"));
+//	rightArm = MoveGroupPtr(new moveit::planning_interface::MoveGroup("right_gripper"));
 
-
+	// Set a timer to process queued grasping points
 	ros::Timer timer = nodeHandler.createTimer(ros::Duration(1), timerCallback);
 
 	// Set the subscription to get the point clouds
@@ -107,24 +131,6 @@ int main(int _argn, char **_argv)
 	// Keep looping
 	ROS_INFO("Grasper node looping");
 	ros::spin();
-
-//	ros::AsyncSpinner spinner(1);
-//	spinner.start();
-
-//	while(true)
-//	{
-//		while(!pointsQueue.empty())
-//		{
-//			ROS_INFO("Popping stuff!");
-//			pointsQueue.pop();
-//		}
-//
-//		ROS_INFO("Sleeping");
-//		sleep(5);
-//	}
-
-//	ROS_INFO("Setup routine completed");
-//	ros::shutdown();
 
 	return EXIT_SUCCESS;
 }
