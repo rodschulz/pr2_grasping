@@ -1,0 +1,18 @@
+<launch>
+	<!-- start up empty world -->
+	<arg name="gui" default="true"/>
+	<arg name="paused" default="false"/>
+
+	<!-- use this argument to use different worlds for the experimental setup -->
+	<arg name="world" default="beer"/>
+
+	<!-- launch ros core and world setup -->
+	<include file="$(find pr2_grasping)/launch/world.launch">
+		<arg name="world" value="$(arg world)"/>
+		<arg name="gui" value="$(arg gui)"/>
+		<arg name="paused" value="$(arg paused)"/>
+	</include>
+
+	<!-- launch the robot -->
+	<include file="$(find pr2_grasping)/launch/pr2.launch"/>
+</launch>
