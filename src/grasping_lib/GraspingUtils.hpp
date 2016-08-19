@@ -14,6 +14,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/ml/ml.hpp>
 #include "Metric.hpp"
+#include "PointFactory.hpp"
+
+#define CONFIG_LOCATION		"src/grasping/config/config.yaml"
+#define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
+#define FRAME_BASE			"base_link"
 
 // Class implementing several utilities for the grasping node's routines
 class GraspingUtils
@@ -78,6 +83,23 @@ public:
 		grid.setInputCloud(cloud_);
 		grid.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
 		grid.filter(*sampledCloud_);
+	}
+
+	static inline geometry_msgs::Pose genPose(const float x_, const float y_, const float z_, const float theta_ = 0, const float dirx_ = 1, const float diry_ = 0, const float dirz_ = 0)
+	{
+		geometry_msgs::Pose pose;
+
+		pose.position.x = x_;
+		pose.position.y = y_;
+		pose.position.z = z_;
+
+		Eigen::Vector3f p = Eigen::Vector3f(dirx_, diry_, dirz_).normalized();
+		pose.orientation.w = cos(theta_ / 2);
+		pose.orientation.x = p.x() * sin(theta_ / 2);
+		pose.orientation.y = p.y() * sin(theta_ / 2);
+		pose.orientation.z = p.z() * sin(theta_ / 2);
+
+		return pose;
 	}
 
 private:

@@ -63,9 +63,12 @@ def analyze(data_):
 		nclusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
 		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(cloudData), nclusters)
 
-		# Synthesize the grasping points
 		if nclusters > 0:
-			rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
+			# Calculate the silhouette coeff only if there's more than 1 cluster
+			if nclusters > 1:
+				rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
+
+			# Synthesize the grasping points
 			graspPoints = graspPoints + synthesizeGraspingPoints(data_=cloudData, labels_=db.labels_, index_=key)
 
 			# Generate debug data if requested
