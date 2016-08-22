@@ -1,6 +1,6 @@
 /**
  * Author: rodrigo
- * 2016     
+ * 2016
  */
 #pragma once
 
@@ -25,12 +25,12 @@ class GraspingUtils
 {
 public:
 	// Gets the transformation between the given reference systems
-	static inline bool getTransformation(tf::StampedTransform &transform_, const tf::TransformListener *transformationListener_, const std::string &target_, const std::string &source_, const ros::Time &time_ = ros::Time::now(), const ros::Duration &timeout_ = ros::Duration(1.0))
+	static inline bool getTransformation(tf::StampedTransform &transform_, const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const ros::Time &time_ = ros::Time::now(), const ros::Duration &timeout_ = ros::Duration(1.0))
 	{
 		try
 		{
-			transformationListener_->waitForTransform(target_, source_, time_, timeout_);
-			transformationListener_->lookupTransform(target_, source_, ros::Time(0), transform_);
+			tfListener_->waitForTransform(target_, source_, time_, timeout_);
+			tfListener_->lookupTransform(target_, source_, ros::Time(0), transform_);
 			return true;
 		}
 		catch (tf::TransformException &ex)
@@ -40,7 +40,21 @@ public:
 		}
 	}
 
-	// Performs the extration of the interesting part of the cloud using an ad-hoc criterion
+	// Transforms a pose between the given source and target reference frames
+	static inline geometry_msgs::Point transformPose(const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const geometry_msgs::Point &point_)
+	{
+		tf::StampedTransform toTarget;
+		while (!GraspingUtils::getTransformation(toTarget, tfListener_, target_, source_));
+		tf::Vector3 conv = toTarget * tf::Vector3(point_.x, point_.y, point_.z);
+
+		geometry_msgs::Point result;
+		result.x = conv.x();
+		result.y = conv.y();
+		result.z = conv.z();
+		return result;
+	}
+
+	// Performs the extraction of the interesting part of the cloud using an ad-hoc criterion
 	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicObjectExtraction(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const tf::StampedTransform &transformation, const bool debug_ = false)
 	{
 		tf::Vector3 point = transformation * tf::Vector3(0, 0, 0.77);
@@ -85,6 +99,7 @@ public:
 		grid.filter(*sampledCloud_);
 	}
 
+	// Generates a pose structure with the given data
 	static inline geometry_msgs::Pose genPose(const float x_, const float y_, const float z_, const float theta_ = 0, const float dirx_ = 1, const float diry_ = 0, const float dirz_ = 0)
 	{
 		geometry_msgs::Pose pose;
