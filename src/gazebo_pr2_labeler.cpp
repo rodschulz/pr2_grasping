@@ -16,7 +16,7 @@
 #include "Writer.hpp"
 
 //Global variables
-tf::TransformListener *transformationListener;
+tf::TransformListener *tfListener;
 ros::Publisher pub;
 CvSVMPtr svm;
 
@@ -67,7 +67,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 	// Get the required transformation
 	tf::StampedTransform transformation;
-	while (!GraspingUtils::getTransformation(transformation, transformationListener, FRAME_KINNECT, FRAME_BASE))
+	while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_KINNECT, FRAME_BASE))
 		;
 
 	// Prepare cloud
@@ -122,7 +122,7 @@ int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "gazebo_pr2_labeler");
 	ros::NodeHandle nodeHandler;
-	transformationListener = new tf::TransformListener(ros::Duration(10.0));
+	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
 	// Load the node's configuration
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
