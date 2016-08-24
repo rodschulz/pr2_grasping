@@ -28,8 +28,8 @@ tf::TransformListener *tfListener;
 
 void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 {
-	// if (!stopDisplacement && msg_->pose.pose.position.x >= 1.1)
-	if (!stopDisplacement && msg_->pose.pose.position.x >= 0.8)
+	if (!stopDisplacement && msg_->pose.pose.position.x >= 1.1)
+	// if (!stopDisplacement && msg_->pose.pose.position.x >= 0.8)
 	{
 		ROS_INFO("Destination reached");
 		stopDisplacement = true;
@@ -59,13 +59,55 @@ void liftUpTorso()
 	ROS_INFO("...torso lifted up");
 }
 
-void moveArms(const int _idx)
+void moveBothArms()
 {
 	ROS_INFO("Preparing arms setup");
 
 	// group to plane movement for both arms
-	moveit::planning_interface::MoveGroup arms("right_arm");
-	arms.setEndEffector("right_eef");
+	moveit::planning_interface::MoveGroup arms("arms");
+	arms.setPoseReferenceFrame("base_link");
+
+	// right arm pose
+	geometry_msgs::Pose rightArmPose;
+	rightArmPose.orientation.w = 1.0;
+	rightArmPose.position.x = 0.3;
+	rightArmPose.position.y = -0.5;
+	rightArmPose.position.z = 1.3;
+
+	// left arm pose
+	geometry_msgs::Pose leftArmPose;
+	leftArmPose.orientation.w = 1.0;
+	leftArmPose.position.x = 0.3;
+	leftArmPose.position.y = 0.5;
+	leftArmPose.position.z = 1.3;
+
+	// set the pose for each arm
+	arms.setPoseTarget(rightArmPose, "r_wrist_roll_link");
+	arms.setPoseTarget(leftArmPose, "l_wrist_roll_link");
+
+	// plan the trajectory
+	moveit::planning_interface::MoveGroup::Plan armsPlan;
+	ROS_INFO("...planing arms trajectory");
+	bool planningOk = arms.plan(armsPlan);
+	ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
+
+	// move the arms
+	if (planningOk)
+	{
+		ROS_INFO("...moving both arms");
+		arms.move();
+	}
+
+	ROS_INFO("...arms movement completed");
+}
+
+void moveArm(const int _idx)
+{
+	ROS_INFO("Preparing arm setup");
+
+	// group to plane arm movement
+	moveit::planning_interface::MoveGroup arm("right_arm");
+	arm.setEndEffector("right_eef");
 
 
 	// right arm pose
@@ -75,9 +117,9 @@ void moveArms(const int _idx)
 		rightPose.orientation.w = 1.0;
 		rightPose.position.x = 0.3;
 		rightPose.position.y = -0.5;
-		rightPose.position.z = 1;
+		rightPose.position.z = 1.3;
 	}
-	else
+	else if(_idx == 2)
 	{
 		rightPose.position.x = 0.45;
 		rightPose.position.y = -0.188152;
@@ -90,18 +132,26 @@ void moveArms(const int _idx)
 		rightPose.orientation.y = p.y() * sin(angle/2);
 		rightPose.orientation.z = p.z() * sin(angle/2);
 	}
+	else
+	{
+		// rightPose.orientation.w = 1.0;
+		// rightPose.position.x = 0.3;
+		// rightPose.position.y = -0.5;
+		// rightPose.position.z = 1;
+		rightPose = GraspingUtils::genPose(0.546, 0.011, 0.77, DEG2RAD(45), 1, 1, 0);
+	}
 
 
 	// set the pose for each arm
 	std::string targetRef = "base_link";
-	arms.setPoseReferenceFrame(targetRef);
-	arms.setPoseTarget(rightPose);
+	arm.setPoseReferenceFrame(targetRef);
+	arm.setPoseTarget(rightPose);
 
 
 
-	ROS_INFO("...plan ref: %s - pose ref: %s", arms.getPlanningFrame().c_str(), arms.getPoseReferenceFrame().c_str());
-	std::string origRef = arms.getCurrentPose().header.frame_id;
-	geometry_msgs::Pose curr = arms.getCurrentPose().pose;
+	ROS_INFO("...plan ref: %s - pose ref: %s", arm.getPlanningFrame().c_str(), arm.getPoseReferenceFrame().c_str());
+	std::string origRef = arm.getCurrentPose().header.frame_id;
+	geometry_msgs::Pose curr = arm.getCurrentPose().pose;
 	ROS_INFO("+++curr:(%.3f, %.3f, %.3f) // ref:%s", curr.position.x, curr.position.y, curr.position.z, origRef.c_str());
 
 	tf::StampedTransform toTarget;
@@ -117,20 +167,20 @@ void moveArms(const int _idx)
 
 
 	// plan the trajectory
-	moveit::planning_interface::MoveGroup::Plan armsPlan;
-	ROS_INFO("...planing arms trajectory");
-	bool planningOk = arms.plan(armsPlan);
+	moveit::planning_interface::MoveGroup::Plan armPlan;
+	ROS_INFO("...planing arm trajectory");
+	bool planningOk = arm.plan(armPlan);
 	ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
 
-	// move the arms
+	// move the arm
 	if (planningOk)
 	{
-		ROS_INFO("...moving arms");
-		arms.move();
+		ROS_INFO("...moving arm");
+		arm.move();
 
 
 		/**********/
-		curr = arms.getCurrentPose().pose;
+		curr = arm.getCurrentPose().pose;
 		ROS_INFO("***after:(%.3f, %.3f, %.3f) // ref:%s", curr.position.x, curr.position.y, curr.position.z, origRef.c_str());
 
 		while (!GraspingUtils::getTransformation(toTarget, tfListener, targetRef, origRef));
@@ -139,7 +189,7 @@ void moveArms(const int _idx)
 		/**********/
 	}
 
-	ROS_INFO("...arms movement completed");
+	ROS_INFO("...arm movement completed");
 }
 
 void moveBase(ros::Publisher &publisher_)
@@ -214,10 +264,13 @@ int main(int argc, char** argv)
 	spinner.start();
 
 	liftUpTorso();
-	moveArms(1);
+	moveBothArms();
+	// moveArm(1);
 	moveBase(publisher);
 	moveHead();
-	moveArms(2);
+	moveArm(2);
+	// ros::Duration(10).sleep();
+	moveArm(3);
 
 	ROS_INFO("Setup routine completed");
 	spinner.stop();
