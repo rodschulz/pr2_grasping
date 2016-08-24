@@ -37,9 +37,9 @@ std::deque<GraspPt> queue;
 boost::mutex mutex;
 // Manipulation group
 MoveGroupPtr arm;
-//
+// Publisher for debug/inspection purposes
 ros::Publisher posePublisher;
-//
+// TF listener for debug/inspection purposes
 tf::TransformListener *tfListener;
 
 
@@ -135,17 +135,17 @@ int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
 	ros::NodeHandle nodeHandler;
+
+	// Debug stuff
+	posePublisher = nodeHandler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1);
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
-	// group to plane movement for both arms
+	// Group to plane movement for both arms
 	ROS_INFO("Setting right arm control");
 	arm = MoveGroupPtr(new moveit::planning_interface::MoveGroup("right_arm"));
 
 	// Set a timer to process queued grasping points
 	ros::Timer timer = nodeHandler.createTimer(ros::Duration(1), timerCallback);
-
-	// Debug publisher
-	posePublisher = nodeHandler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1);
 
 	// Set the subscription to get the point clouds
 	ROS_INFO("Subscriber set");

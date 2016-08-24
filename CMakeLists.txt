@@ -116,6 +116,7 @@ include_directories(${catkin_INCLUDE_DIRS})
 add_executable(gazebo_pr2_labeler src/gazebo_pr2_labeler.cpp)
 add_executable(gazebo_pr2_setup src/gazebo_pr2_setup.cpp)
 add_executable(pr2_grasper src/pr2_grasper.cpp)
+add_executable(test_node src/test_node.cpp)
 
 # Set the linking dependencies for the complex applications
 set(APPS_LINKING_DEPENDENCIES
@@ -133,3 +134,4 @@ set(APPS_LINKING_DEPENDENCIES
 target_link_libraries(gazebo_pr2_setup ${catkin_LIBRARIES})
 target_link_libraries(gazebo_pr2_labeler ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasper ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(test_node ${APPS_LINKING_DEPENDENCIES})
