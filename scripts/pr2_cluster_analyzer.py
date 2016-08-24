@@ -99,7 +99,7 @@ if __name__ == '__main__':
 		publisher = rp.Publisher('/pr2_grasping/grasping_points', Float32MultiArray, queue_size=2)
 
 		# Setup node name
-		rp.init_node('pr2_cluster_analizer', anonymous=False)
+		rp.init_node('pr2_cluster_analyzer', anonymous=False)
 
 		# Setup subscriber
 		rp.Subscriber('/pr2_grasping/labeled_cloud', PointCloud2, analyze)
