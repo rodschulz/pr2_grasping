@@ -11,25 +11,24 @@
 #include <pr2_controllers_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <tf/transform_listener.h>
+#include <shape_tools/solid_primitive_dims.h>
+#include "GraspingUtils.hpp"
+
 
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> HeadClient;
 
 // flag to coordinate the displacement detention
 bool stopDisplacement = false;
-
-
-
-#include <tf/transform_listener.h>
-#include "GraspingUtils.hpp"
+// Transformations listener
 tf::TransformListener *tfListener;
-
 
 
 void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 {
 	if (!stopDisplacement && msg_->pose.pose.position.x >= 1.1)
-	// if (!stopDisplacement && msg_->pose.pose.position.x >= 0.8)
+		// if (!stopDisplacement && msg_->pose.pose.position.x >= 0.8)
 	{
 		ROS_INFO("Destination reached");
 		stopDisplacement = true;
@@ -101,7 +100,8 @@ void moveBothArms()
 	ROS_INFO("...arms movement completed");
 }
 
-void moveArm(const int _idx)
+void moveArmToPose(const geometry_msgs::Pose &targetPose_,
+				   const std::string &targetRef_)
 {
 	ROS_INFO("Preparing arm setup");
 
@@ -109,43 +109,10 @@ void moveArm(const int _idx)
 	moveit::planning_interface::MoveGroup arm("right_arm");
 	arm.setEndEffector("right_eef");
 
-
-	// right arm pose
-	geometry_msgs::Pose rightPose;
-	if (_idx == 1)
-	{
-		rightPose.orientation.w = 1.0;
-		rightPose.position.x = 0.3;
-		rightPose.position.y = -0.5;
-		rightPose.position.z = 1.3;
-	}
-	else if(_idx == 2)
-	{
-		rightPose.position.x = 0.45;
-		rightPose.position.y = -0.188152;
-		rightPose.position.z = 1;
-
-		Eigen::Vector3f p = Eigen::Vector3f(1, 0, 1).normalized();
-		float angle = DEG2RAD(60);
-		rightPose.orientation.w = cos(angle/2);
-		rightPose.orientation.x = p.x() * sin(angle/2);
-		rightPose.orientation.y = p.y() * sin(angle/2);
-		rightPose.orientation.z = p.z() * sin(angle/2);
-	}
-	else
-	{
-		// rightPose.orientation.w = 1.0;
-		// rightPose.position.x = 0.3;
-		// rightPose.position.y = -0.5;
-		// rightPose.position.z = 1;
-		rightPose = GraspingUtils::genPose(0.546, 0.011, 0.77, DEG2RAD(45), 1, 1, 0);
-	}
-
-
-	// set the pose for each arm
-	std::string targetRef = "base_link";
-	arm.setPoseReferenceFrame(targetRef);
-	arm.setPoseTarget(rightPose);
+	// Set the pose for the arm
+	arm.setPoseReferenceFrame(targetRef_);
+	arm.setPoseTarget(targetPose_);
+	arm.setPlanningTime(30);
 
 
 
@@ -155,20 +122,20 @@ void moveArm(const int _idx)
 	ROS_INFO("+++curr:(%.3f, %.3f, %.3f) // ref:%s", curr.position.x, curr.position.y, curr.position.z, origRef.c_str());
 
 	tf::StampedTransform toTarget;
-	while (!GraspingUtils::getTransformation(toTarget, tfListener, targetRef, origRef));
+	while (!GraspingUtils::getTransformation(toTarget, tfListener, targetRef_, origRef));
 	tf::Vector3 conv = toTarget * tf::Vector3(curr.position.x, curr.position.y, curr.position.z);
 	ROS_INFO("+++curr:(%.3f, %.3f, %.3f) // ref:%s", conv.x(), conv.y(), conv.z(), toTarget.frame_id_.c_str());
 
 	tf::StampedTransform toOrig;
-	while (!GraspingUtils::getTransformation(toOrig, tfListener, origRef, targetRef));
-	conv = toOrig * tf::Vector3(rightPose.position.x, rightPose.position.y, rightPose.position.z);
+	while (!GraspingUtils::getTransformation(toOrig, tfListener, origRef, targetRef_));
+	conv = toOrig * tf::Vector3(targetPose_.position.x, targetPose_.position.y, targetPose_.position.z);
 	ROS_INFO("+++target:(%.3f, %.3f, %.3f) // ref:%s", conv.x(), conv.y(), conv.z(), toOrig.frame_id_.c_str());
 
 
 
 	// plan the trajectory
-	moveit::planning_interface::MoveGroup::Plan armPlan;
 	ROS_INFO("...planing arm trajectory");
+	moveit::planning_interface::MoveGroup::Plan armPlan;
 	bool planningOk = arm.plan(armPlan);
 	ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
 
@@ -183,7 +150,7 @@ void moveArm(const int _idx)
 		curr = arm.getCurrentPose().pose;
 		ROS_INFO("***after:(%.3f, %.3f, %.3f) // ref:%s", curr.position.x, curr.position.y, curr.position.z, origRef.c_str());
 
-		while (!GraspingUtils::getTransformation(toTarget, tfListener, targetRef, origRef));
+		while (!GraspingUtils::getTransformation(toTarget, tfListener, targetRef_, origRef));
 		conv = toTarget * tf::Vector3(curr.position.x, curr.position.y, curr.position.z);
 		ROS_INFO("***after:(%.3f, %.3f, %.3f) // ref:%s", conv.x(), conv.y(), conv.z(), toTarget.frame_id_.c_str());
 		/**********/
@@ -244,37 +211,95 @@ void moveHead()
 	ROS_INFO("...head moved");
 }
 
+void addCollisionBox(ros::Publisher &collisionPub_,
+					 const std::string &frame_,
+					 const std::string &objectName_,
+					 const geometry_msgs::Pose &objectPose_,
+					 const float dimx_,
+					 const float dimy_,
+					 const float dimz_)
+{
+	moveit_msgs::CollisionObject collision;
+
+	collision.id = objectName_;
+	collision.header.stamp = ros::Time::now();
+	collision.header.frame_id = frame_;
+
+	// Add the bounding box of the object for collisions and its pose
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = shape_msgs::SolidPrimitive::BOX;
+	primitive.dimensions.resize(shape_tools::SolidPrimitiveDimCount<shape_msgs::SolidPrimitive::BOX>::value);
+	primitive.dimensions[shape_msgs::SolidPrimitive::BOX_X] = dimx_;
+	primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Y] = dimy_;
+	primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Z] = dimz_;
+
+	collision.primitives.push_back(primitive);
+	collision.primitive_poses.push_back(objectPose_);
+
+	// Remove and detach the object first (just in case)
+	ROS_INFO("Removing object");
+	collision.operation = moveit_msgs::CollisionObject::REMOVE;
+	collisionPub_.publish(collision);
+	ros::WallDuration(1.0).sleep();
+
+	// Then add it to the scene
+	ROS_INFO("Adding object");
+	collision.operation = moveit_msgs::CollisionObject::ADD;
+	collisionPub_.publish(collision);
+	ros::WallDuration(1.0).sleep();
+}
+
+void addObjects(ros::Publisher &collisionPub_)
+{
+	ROS_INFO("Adding table to scene");
+	float dimH = 0.92;
+	float dimV = 0.78;
+	geometry_msgs::Pose tablePose = GraspingUtils::genPose(0.37 + dimH / 2, 0 , 0 + dimV / 2);
+	addCollisionBox(collisionPub_, "base_link", "table", tablePose, dimH, dimH, dimV);
+
+	ROS_INFO("Adding object to scene");
+	dimH = 0.06 * 2;
+	dimV = 0.25;
+	geometry_msgs::Pose objectPose = GraspingUtils::genPose(0.58, 0, 0.87);
+	addCollisionBox(collisionPub_, "base_link", "target_object", objectPose, dimH, dimH, dimV);
+}
+
 int main(int argc, char** argv)
 {
 	// setup node
 	ros::init(argc, argv, "test_node");
-
-	// define publisher and subscriber for the base's movement
 	ros::NodeHandle handler;
-	ros::Publisher publisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
-	ros::Subscriber subscriber = handler.subscribe("/base_pose_ground_truth", 1, displacementCallback);
-
-
-	// Tf listener
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
+	// define publishers and subscribers
+	ros::Publisher displacementPub = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 10);
+	ros::Publisher collisionPub = handler.advertise<moveit_msgs::CollisionObject>("/collision_object", 10);
+	// ros::Publisher attachPub = handler.advertise<moveit_msgs::AttachedCollisionObject>("/attached_collision_object", 10);
+	ros::Subscriber basePoseSub = handler.subscribe("/base_pose_ground_truth", 1, displacementCallback);
 
+	// Set spinning
 	ROS_INFO("Beginning setup routine");
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
 
-	liftUpTorso();
-	moveBothArms();
-	// moveArm(1);
-	moveBase(publisher);
-	moveHead();
-	moveArm(2);
+	addObjects(collisionPub);
+
+	// liftUpTorso();
+	// moveBothArms();
+	// moveArmToPose(GraspingUtils::genPose(0.3, -0.5, 1.3), "base_link");
+	// moveBase(displacementPub);
+	// moveHead();
+	// moveArmToPose(GraspingUtils::genPose(0.45, -0.188152, 1, DEG2RAD(60), 1, 0, 1), "base_link");
 	// ros::Duration(10).sleep();
-	moveArm(3);
+	// moveArmToPose(GraspingUtils::genPose(0.546, 0.011, 0.77, DEG2RAD(45), 1, 1, 0), "base_link");
+	moveArmToPose(GraspingUtils::genPose(0.607, 0.006, 1.2, 0, 0, 1, 0), "base_link");
+
+
 
 	ROS_INFO("Setup routine completed");
+	// ros::waitForShutdown();
 	spinner.stop();
-	// ros::shutdown();
+	ros::shutdown();
 
 	return EXIT_SUCCESS;
 }
