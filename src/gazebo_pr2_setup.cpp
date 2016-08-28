@@ -56,20 +56,21 @@ void moveArms()
 
 	// group to plane movement for both arms
 	moveit::planning_interface::MoveGroup armsGroup("arms");
+	armsGroup.setPoseReferenceFrame("base_link");
 
 	// right arm pose
 	geometry_msgs::Pose rightArmPose;
 	rightArmPose.orientation.w = 1.0;
 	rightArmPose.position.x = 0.3;
 	rightArmPose.position.y = -0.5;
-	rightArmPose.position.z = 1.4;
+	rightArmPose.position.z = 1.3;
 
 	// left arm pose
 	geometry_msgs::Pose leftArmPose;
 	leftArmPose.orientation.w = 1.0;
 	leftArmPose.position.x = 0.3;
 	leftArmPose.position.y = 0.5;
-	leftArmPose.position.z = 1.4;
+	leftArmPose.position.z = 1.3;
 
 	// set the pose for each arm
 	armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");

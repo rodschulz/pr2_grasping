@@ -129,7 +129,7 @@ int main(int _argn, char **_argv)
 	if (!Config::load(CONFIG_LOCATION))
 		throw std::runtime_error((std::string) "Error reading config at " + Utils::getWorkingDirectory() + CONFIG_LOCATION);
 
-	// Load the BoW definition and prepare the clasificator
+	// Load the BoW definition and prepare the classificator
 	ROS_INFO("Training labeling classifier");
 	cv::Mat BoW;
 	std::map<std::string, std::string> metadata;
@@ -140,7 +140,8 @@ int main(int _argn, char **_argv)
 	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
 	// Set the subscription to get the point clouds
-	ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
+	// ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
+	ros::Subscriber sub = nodeHandler.subscribe("/move_group/filtered_cloud", 1, cloudCallback);
 
 	// Keep looping
 	ROS_INFO("Labeler node looping");
