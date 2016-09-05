@@ -1,0 +1,11 @@
+<launch>
+	<!-- send pr2 urdf to param server -->
+	<include file="$(find pr2_description)/robots/upload_pr2.launch"/>
+
+	<!-- push robot_description to factory and spawn robot in gazebo -->
+	<node args="$(optenv ROBOT_INITIAL_POSE) -unpause -urdf -param robot_description -model pr2 -ros_namespace /gazebo" name="spawn_pr2_model" output="screen" pkg="gazebo_ros" respawn="false" type="spawn_model"/>
+	
+	<!-- default bringup script -->
+	<!-- <include file="$(find pr2_gazebo)/launch/pr2_bringup.launch"/> -->
+	<include file="$(find pr2_grasping)/launch/pr2_bringup.launch"/>
+</launch>

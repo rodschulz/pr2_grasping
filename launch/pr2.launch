@@ -1,7 +1,16 @@
 <launch>
-	<!-- launch the robot -->
-	<include file="$(find pr2_gazebo)/launch/pr2.launch"/>
+	<!-- First launch the robot -->
 
-	<!-- launch moveit -->
-	<include file="$(find pr2_moveit_config)/launch/move_group.launch"/>
+	<!-- Startup PR2 without any mechanism controllers -->
+	<!-- <include file="$(find pr2_gazebo)/launch/pr2_no_controllers.launch" /> -->
+	<include file="$(find pr2_grasping)/launch/pr2_no_controllers.launch" />
+
+	<!-- Load and Start Default Controllers -->
+	<!-- <include file="$(find pr2_controller_configuration_gazebo)/launch/pr2_default_controllers.launch" /> -->
+	<include file="$(find pr2_grasping)/launch/pr2_default_controllers.launch" />
+
+
+	<!-- Then launch move_group so moveit can be used -->
+	<!-- <include file="$(find pr2_moveit_config)/launch/move_group.launch"/> -->
+	<include file="$(find pr2_grasping)/launch/move_group.launch"/>
 </launch>
