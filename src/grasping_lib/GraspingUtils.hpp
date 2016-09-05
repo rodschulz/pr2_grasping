@@ -13,6 +13,8 @@
 #include <pcl/point_cloud.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/ml/ml.hpp>
+#include <trajectory_msgs/JointTrajectory.h>
+#include <moveit/move_group_interface/move_group.h>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
 
@@ -115,6 +117,26 @@ public:
 		pose.orientation.z = p.z() * sin(theta_ / 2);
 
 		return pose;
+	}
+
+	static inline trajectory_msgs::JointTrajectory generateGraspPosture(const float value_, const std::string gripperGroup_)
+	{
+		trajectory_msgs::JointTrajectory posture;
+		moveit::planning_interface::MoveGroup gripper(gripperGroup_);
+
+		// Set the active joints names
+		std::vector<std::string> activeJoints = gripper.getActiveJoints();
+		BOOST_FOREACH(const std::string name, activeJoints)
+		{
+			posture.joint_names.push_back(name);
+		}
+
+		posture.points.resize(1);
+		posture.points[0].positions.resize(posture.joint_names.size(), value_);
+		posture.points[0].time_from_start = ros::Duration(45.0);
+		posture.points[0].effort.resize(posture.joint_names.size(), -1.0);
+
+		return posture;
 	}
 
 private:
