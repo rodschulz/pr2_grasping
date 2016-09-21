@@ -1,12 +1,9 @@
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
-
 #include <moveit_msgs/DisplayRobotState.h>
 #include <moveit_msgs/DisplayTrajectory.h>
-
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/CollisionObject.h>
-
 #include <boost/foreach.hpp>
 #include <GraspingUtils.hpp>
 #include <ros/ros.h>
@@ -15,9 +12,9 @@
 #define TARGET_OBJECT	"test_box"
 
 
-int main(int argc, char **argv)
+int main(int argn_, char **argv_)
 {
-	ros::init(argc, argv, "test_group_pick");
+	ros::init(argn_, argv_, "test_group_pick");
 	ros::NodeHandle node_handle;
 	ros::AsyncSpinner spinner(1);
 	spinner.start();

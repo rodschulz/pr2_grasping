@@ -16,12 +16,9 @@
 #include <shape_tools/solid_primitive_dims.h>
 #include "GraspingUtils.hpp"
 
-#include <moveit_msgs/DisplayRobotState.h>
-#include <moveit_msgs/DisplayTrajectory.h>
-
 
 #define TARGET_OBJECT 		"target_object"
-#define SUPPORT_OBJECT 		"table"
+#define SUPPORT_OBJECT 		"support_object"
 
 
 typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
@@ -307,23 +304,16 @@ void groupPick(moveit::planning_interface::PlanningSceneInterface &planningScene
 
 
 /**************************************************/
-void actionClientPick()
-{}
-
-
-/**************************************************/
-int main(int argc, char** argv)
+int main(int argn_, char **argv_)
 {
 	// setup node
-	ros::init(argc, argv, "pr2_grasper");
+	ros::init(argn_, argv_, "example_group_pick");
 	ros::NodeHandle handler;
 
 	// define publishers and subscribers
 	ros::Publisher displacementPub = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 10);
 	ros::Publisher posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/test/grasp_pose", 10, true);
 	ros::Subscriber basePoseSub = handler.subscribe("/base_pose_ground_truth", 1, displacementCallback);
-	// ros::Publisher collisionPub = handler.advertise<moveit_msgs::CollisionObject>("/collision_object", 10);
-	// ros::Publisher attachPub = handler.advertise<moveit_msgs::AttachedCollisionObject>("/attached_collision_object", 10);
 
 
 	// Set spinning
@@ -361,7 +351,6 @@ int main(int argc, char** argv)
 
 	// Pick an object
 	groupPick(planningScene, posePublisher, targetPose, supportPose);
-	// actionClientPick();
 
 
 	ROS_INFO("Routine completed");

@@ -210,9 +210,9 @@ void pick(PickupClient *client_,
 
 
 /**********************************************************************/
-int main(int argc, char **argv)
+int main(int argn_, char **argv_)
 {
-	ros::init(argc, argv, "test_action_client");
+	ros::init(argn_, argv_, "test_action_client");
 	ros::NodeHandle handle;
 	ros::AsyncSpinner spinner(2);
 	spinner.start();

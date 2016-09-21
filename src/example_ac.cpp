@@ -48,9 +48,9 @@ void addObject(ros::Publisher &collisionPub_,
 }
 
 /**********************************************************************/
-int main(int _argn, char **_argv)
+int main(int argn_, char **argv_)
 {
-	ros::init(argc, argv, "test_action_client");
+	ros::init(argn_, argv_, "example_action_client");
 	ros::NodeHandle handle;
 	ros::AsyncSpinner spinner(2);
 	spinner.start();
