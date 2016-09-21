@@ -113,11 +113,16 @@ include_directories(src/grasping_lib/)
 include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executables
+### App nodes ###
 add_executable(gazebo_pr2_labeler src/gazebo_pr2_labeler.cpp)
 add_executable(gazebo_pr2_setup src/gazebo_pr2_setup.cpp)
 add_executable(pr2_grasper src/pr2_grasper.cpp)
-add_executable(test_group_pick src/test_group_pick.cpp)
-add_executable(test_action_client src/test_action_client.cpp)
+### Example nodes ###
+add_executable(example_gp src/example_gp.cpp)
+add_executable(example_ac src/example_ac.cpp)
+### Test nodes ###
+add_executable(test_gp src/test_gp.cpp)
+add_executable(test_ac src/test_ac.cpp)
 add_executable(pick_place_tutorial src/pick_place_tutorial.cpp)
 
 # Set the linking dependencies for the complex applications
@@ -133,9 +138,14 @@ set(APPS_LINKING_DEPENDENCIES
 	${catkin_LIBRARIES})
 
 # Target linking dependencies
+### App nodes ###
 target_link_libraries(gazebo_pr2_setup ${catkin_LIBRARIES})
 target_link_libraries(gazebo_pr2_labeler ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasper ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(test_group_pick ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(test_action_client ${APPS_LINKING_DEPENDENCIES})
+### Example nodes ###
+target_link_libraries(example_gp ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(example_ac ${APPS_LINKING_DEPENDENCIES})
+### Test nodes ###
+target_link_libraries(test_gp ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(test_ac ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pick_place_tutorial ${APPS_LINKING_DEPENDENCIES})
