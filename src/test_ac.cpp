@@ -24,7 +24,9 @@ typedef actionlib::SimpleActionClient<moveit_msgs::PickupAction> PickupClient;
 
 
 /**********************************************************************/
-void prepareGripper(GripperClient *client_, const float position_, const float maxEffort_)
+void prepareGripper(GripperClient *client_,
+					const float position_,
+					const float maxEffort_)
 {
 	control_msgs::GripperCommandGoal cmd;
 	cmd.command.position = position_;
@@ -115,6 +117,9 @@ moveit_msgs::PickupGoal genPickGoal(const moveit::planning_interface::MoveGroup 
 	goal.planning_options.replan_delay = 3;
 	goal.planning_options.replan_attempts = 5;
 
+	goal.planning_options.planning_scene_diff.is_diff = true;
+	goal.planning_options.planning_scene_diff.robot_state.is_diff = true;
+
 	goal.possible_grasps.push_back(grasp_);
 
 	return goal;
@@ -153,7 +158,7 @@ moveit_msgs::Grasp genGrasp(const std::string &target_,
 	grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
 	grasp.grasp_posture.points.resize(1);
 	grasp.grasp_posture.points[0].positions.resize(1);
-	grasp.grasp_posture.points[0].positions[0] = 0;
+	grasp.grasp_posture.points[0].positions[0] = 0.02;
 	grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 

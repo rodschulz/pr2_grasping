@@ -11,8 +11,6 @@
 #include <control_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit/move_group_pick_place_capability/capability_names.h>
-#include <moveit_msgs/PickupAction.h>
 #include <shape_tools/solid_primitive_dims.h>
 #include "GraspingUtils.hpp"
 
@@ -23,7 +21,6 @@
 
 typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
-typedef actionlib::SimpleActionClient<moveit_msgs::PickupAction> PickupClient;
 
 
 enum Effector
@@ -260,15 +257,15 @@ void groupPick(moveit::planning_interface::PlanningSceneInterface &planningScene
 	grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
 	grasp.pre_grasp_posture.points.resize(1);
 	grasp.pre_grasp_posture.points[0].positions.resize(1);
-	grasp.pre_grasp_posture.points[0].positions[0] = 1.1;
-	grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(60.0);
+	grasp.pre_grasp_posture.points[0].positions[0] = 1;
+	grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
 	grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
 	grasp.grasp_posture.points.resize(1);
 	grasp.grasp_posture.points[0].positions.resize(1);
 	grasp.grasp_posture.points[0].positions[0] = 0;
-	grasp.grasp_posture.points[0].time_from_start = ros::Duration(60.0);
+	grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
 	grasp.post_grasp_retreat.direction.header.frame_id = "base_footprint";
@@ -288,16 +285,13 @@ void groupPick(moveit::planning_interface::PlanningSceneInterface &planningScene
 
 	moveit::planning_interface::MoveGroup group("right_arm");
 	group.setEndEffector("right_eef");
-	group.setPlanningTime(60.0);
+	group.setPlanningTime(45.0);
 	// group.setPoseTarget(grasp.grasp_pose);
 	group.setPlannerId("RRTConnectkConfigDefault");
 
 	ROS_INFO("...planning frame: %s", group.getPlanningFrame().c_str());
 	ROS_INFO("...end effector link: %s", group.getEndEffectorLink().c_str());
 
-	// std::vector<moveit_msgs::Grasp> grasps;
-	// grasps.push_back(grasp);
-	// group.pick(TARGET_OBJECT, grasps);
 	group.pick(TARGET_OBJECT, grasp);
 	ros::Duration(3).sleep();
 }
@@ -351,6 +345,10 @@ int main(int argn_, char **argv_)
 
 	// Pick an object
 	groupPick(planningScene, posePublisher, targetPose, supportPose);
+
+
+	ROS_INFO("Moving arm after picking");
+	moveArmToPose(RIGHT_ARM, GraspingUtils::genPose(0.35, -0.5, 1.1), "base_footprint");
 
 
 	ROS_INFO("Routine completed");
