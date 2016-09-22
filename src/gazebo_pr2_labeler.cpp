@@ -2,6 +2,8 @@
  * Author: rodrigo
  * 2016
  */
+#define PCL_NO_PRECOMPILE 
+
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_ros/point_cloud.h>
@@ -14,6 +16,30 @@
 #include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
 #include "Writer.hpp"
+
+
+//#include <pcl/point_types.h>
+//#include <pcl/point_cloud.h>
+//#include <pcl/io/pcd_io.h>
+
+struct PointXYZNormalL 
+{ 
+  PCL_ADD_POINT4D;	// Add x,y,z coordinates
+  PCL_ADD_NORMAL4D;	// Add normal coordinates
+  uint32_t label;	// Add label
+  
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW   // make sure our new allocators are aligned 
+} EIGEN_ALIGN16;                    // enforce SSE padding for correct memory alignment 
+
+POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNormalL,
+									( float, x, x )
+									( float, y, y )
+									( float, z, z )
+									( float, normal_x, normal_x )
+									( float, normal_y, normal_y )
+									( float, normal_z, normal_z )
+									( uint32_t, label, label )
+                                  )
 
 //Global variables
 tf::TransformListener *tfListener;
