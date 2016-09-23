@@ -2,6 +2,20 @@ import numpy as np
 import sensor_msgs.point_cloud2 as pc
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import rospkg
+
+
+# Package's name
+packageName = 'pr2_grasping'
+# Relative location of node's config file 
+configLocation = 'config/config.yaml'
+
+
+##################################################
+def getConfigPath():
+	rospack = rospkg.RosPack()
+	fullpath = rospack.get_path(packageName)
+	return fullpath + '/' + configLocation
 
 
 ##################################################

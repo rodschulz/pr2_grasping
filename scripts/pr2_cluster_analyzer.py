@@ -10,8 +10,6 @@ from sklearn.cluster import DBSCAN
 from sklearn import metrics
 
 
-# Node configuration file location
-configLocation = 'src/grasping/config/config.yaml'
 # Debug flag 
 debug = False
 # Object for publishing the grasping points 
@@ -91,7 +89,7 @@ def analyze(data_):
 if __name__ == '__main__':
 	try:
 		# Load config file
-		with open(configLocation, 'r') as f:
+		with open(utils.getConfigPath(), 'r') as f:
 			config = yaml.load(f)
 			debug = config['analyzerDebug']
 

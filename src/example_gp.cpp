@@ -348,7 +348,8 @@ int main(int argn_, char **argv_)
 
 
 	ROS_INFO("Moving arm after picking");
-	moveArmToPose(RIGHT_ARM, GraspingUtils::genPose(0.35, -0.5, 1.1), "base_footprint");
+	// moveArmToPose(RIGHT_ARM, GraspingUtils::genPose(0.35, -0.5, 1.1), "base_footprint");
+	moveArmToPose(RIGHT_ARM, GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0), "base_footprint");
 
 
 	ROS_INFO("Routine completed");
