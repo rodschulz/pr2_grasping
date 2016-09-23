@@ -42,13 +42,14 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 tf::TransformListener *tfListener;
 ros::Publisher pub;
 CvSVMPtr svm;
+float clippingPlaneZ = 0.615;
 
 
-/***** Method that generates a labeled cloud ready to be published *****/
-// pcl::PointCloud<pcl::PointXYZL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_, const cv::Mat &labels_, const bool debug_ = false)
-pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_, const cv::Mat &labels_, const bool debug_ = false)
+/**************************************************/
+pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+		const cv::Mat &labels_,
+		const bool debug_ = false)
 {
-	// pcl::PointCloud<pcl::PointXYZL>::Ptr labeledCloud = pcl::PointCloud<pcl::PointXYZL>::Ptr(new pcl::PointCloud<pcl::PointXYZL>());
 	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = pcl::PointCloud<PointXYZNL>::Ptr(new pcl::PointCloud<PointXYZNL>());
 
 	// Get the indices of the sorted data according to the labels
@@ -64,7 +65,6 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 		int label = labels_.at<float>(index);
 
 		pcl::PointNormal p = cloud_->at(index);
-		// labeledCloud->push_back(PointFactory::createPointXYZL(p.x, p.y, p.z, label));
 		PointXYZNL newPoint;
 		newPoint.x = p.x;
 		newPoint.y = p.y;
@@ -89,7 +89,7 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 }
 
 
-/***** Callback called when a new point cloud received from the sensor *****/
+/**************************************************/
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 {
 	if (msg_->height == 0 || msg_->width == 0)
@@ -132,7 +132,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, 0.615, debugEnabled);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled);
 
 	static bool debugDone = false;
 	if (!debugDone && debugEnabled)
@@ -167,11 +167,9 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 
 	/***** STAGE 4: publish data *****/
-	// pcl::PointCloud<pcl::PointXYZL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
 	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
 
 	sensor_msgs::PointCloud2 output;
-	// pcl::toROSMsg<pcl::PointXYZL>(*labeledCloud, output);
 	pcl::toROSMsg<PointXYZNL>(*labeledCloud, output);
 	output.header.stamp = ros::Time::now();
 	output.header.frame_id = FRAME_KINNECT;
@@ -188,10 +186,10 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 }
 
 
-/***** Main method *****/
-int main(int _argn, char **_argv)
+/**************************************************/
+int main(int argn_, char **argv_)
 {
-	ros::init(_argn, _argv, "gazebo_pr2_labeler");
+	ros::init(argn_, argv_, "gazebo_pr2_labeler");
 	ros::NodeHandle nodeHandler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
@@ -200,12 +198,18 @@ int main(int _argn, char **_argv)
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
+	clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>(0.5);
+
 	// Load the BoW definition and prepare the classificator
 	ROS_INFO("Training labeling classifier");
 	cv::Mat BoW;
 	std::map<std::string, std::string> metadata;
 	Loader::loadMatrix(Config::get()["bowLocation"].as<std::string>(), BoW, &metadata);
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
+
+	// Begin spinner
+	ros::AsyncSpinner spinner(2);
+	spinner.start();
 
 	// Set the publisher
 	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
@@ -216,7 +220,8 @@ int main(int _argn, char **_argv)
 
 	// Keep looping
 	ROS_INFO("Labeler node looping");
-	ros::spin();
+	// ros::spin();
+	ros::waitForShutdown();
 
 	return EXIT_SUCCESS;
 }

@@ -150,10 +150,10 @@ void moveHead()
 	ROS_INFO("...head moved");
 }
 
-int main(int argc, char** argv)
+int main(int argn_, char** argv_)
 {
 	// setup node
-	ros::init(argc, argv, "gazebo_pr2_setup");
+	ros::init(argn_, argv_, "gazebo_pr2_setup");
 
 	// Load the node's configuration
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());

@@ -27,6 +27,10 @@ setup:
 
     headTarget: {x: 0.9, y: 0.0, z: 0.5}
 
+##### labeler node options #####
+labeler:
+    clippingPlaneZ: 0.62
+
 ##### descriptor calculation params #####
 descriptor:
     patchSize: 0.02
