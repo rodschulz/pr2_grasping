@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <tf/transform_listener.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/filters/plane_clipper3D.h>
@@ -18,14 +19,26 @@
 #include "Metric.hpp"
 #include "PointFactory.hpp"
 
-#define CONFIG_LOCATION		"src/grasping/config/config.yaml"
+
+#define PACKAGE_NAME		"pr2_grasping"
+#define CONFIG_LOCATION		"config/config.yaml"
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_link"
+
 
 // Class implementing several utilities for the grasping node's routines
 class GraspingUtils
 {
 public:
+	// Returns the full path of the package's configuration file
+	static inline std::string getConfigPath()
+	{
+		std::string packagePath = ros::package::getPath(PACKAGE_NAME);
+		std::string fullpath = packagePath + "/" + CONFIG_LOCATION;
+		return fullpath;
+	}
+
+
 	// Gets the transformation between the given reference systems
 	static inline bool getTransformation(tf::StampedTransform &transform_, const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const ros::Time &time_ = ros::Time::now(), const ros::Duration &timeout_ = ros::Duration(1.0))
 	{
@@ -42,6 +55,7 @@ public:
 		}
 	}
 
+
 	// Transforms a pose between the given source and target reference frames
 	static inline geometry_msgs::Point transformPose(const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const geometry_msgs::Point &point_)
 	{
@@ -56,10 +70,11 @@ public:
 		return result;
 	}
 
-	// Performs the extraction of the interesting part of the cloud using an ad-hoc criterion
-	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicObjectExtraction(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const tf::StampedTransform &transformation, const bool debug_ = false)
+
+	// Clips the given cloud using a plane at the given Z
+	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const tf::StampedTransform &transformation, const float clippingZ_, const bool debug_ = false)
 	{
-		tf::Vector3 point = transformation * tf::Vector3(0, 0, 0.77);
+		tf::Vector3 point = transformation * tf::Vector3(0, 0, clippingZ_);
 
 		// Calculate the clipping plane
 		tf::Vector3 localNormal = transformation.getBasis().getColumn(2);
@@ -92,6 +107,7 @@ public:
 		return filteredCloud;
 	}
 
+
 	// Downsamples the given cloud
 	static inline void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const float voxelSize_, pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_)
 	{
@@ -100,6 +116,7 @@ public:
 		grid.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
 		grid.filter(*sampledCloud_);
 	}
+
 
 	// Generates a pose structure with the given data
 	static inline geometry_msgs::Pose genPose(const float x_, const float y_, const float z_, const float theta_ = 0, const float dirx_ = 1, const float diry_ = 0, const float dirz_ = 0)
@@ -118,6 +135,7 @@ public:
 
 		return pose;
 	}
+
 
 	static inline trajectory_msgs::JointTrajectory generateGraspPosture(const float value_, const std::string gripperGroup_)
 	{

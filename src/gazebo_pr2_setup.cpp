@@ -11,16 +11,22 @@
 #include <pr2_controllers_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include "Config.hpp"
+#include "GraspingUtils.hpp"
+
 
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> HeadClient;
 
+
 // flag to coordinate the displacement detention
 bool stopDisplacement = false;
+float displacementThreshold = 1.0;
+
 
 void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 {
-	if (!stopDisplacement && msg_->pose.pose.position.x >= 1.1)
+	if (!stopDisplacement && msg_->pose.pose.position.x >= displacementThreshold)
 	{
 		ROS_INFO("Destination reached");
 		stopDisplacement = true;
@@ -39,7 +45,7 @@ void liftUpTorso()
 	ROS_INFO("Lifting up torso");
 
 	pr2_controllers_msgs::SingleJointPositionGoal torsoGoal;
-	torsoGoal.position = 0.19;
+	torsoGoal.position = Config::get()["setup"]["torsoPosition"].as<float>(0.18);
 	torsoGoal.min_duration = ros::Duration(1.0);
 	torsoGoal.max_velocity = 5.0;
 
@@ -61,16 +67,16 @@ void moveArms()
 	// right arm pose
 	geometry_msgs::Pose rightArmPose;
 	rightArmPose.orientation.w = 1.0;
-	rightArmPose.position.x = 0.3;
-	rightArmPose.position.y = -0.5;
-	rightArmPose.position.z = 1.3;
+	rightArmPose.position.x = Config::get()["setup"]["armsPosition"]["right"]["x"].as<float>(0.3);
+	rightArmPose.position.y = Config::get()["setup"]["armsPosition"]["right"]["y"].as<float>(-0.5);
+	rightArmPose.position.z = Config::get()["setup"]["armsPosition"]["right"]["z"].as<float>(1.1);
 
 	// left arm pose
 	geometry_msgs::Pose leftArmPose;
 	leftArmPose.orientation.w = 1.0;
-	leftArmPose.position.x = 0.3;
-	leftArmPose.position.y = 0.5;
-	leftArmPose.position.z = 1.3;
+	leftArmPose.position.x = Config::get()["setup"]["armsPosition"]["left"]["x"].as<float>(0.3);
+	leftArmPose.position.y = Config::get()["setup"]["armsPosition"]["left"]["y"].as<float>(0.5);
+	leftArmPose.position.z = Config::get()["setup"]["armsPosition"]["left"]["z"].as<float>(1.1);
 
 	// set the pose for each arm
 	armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
@@ -121,9 +127,9 @@ void moveHead()
 	// the target point, expressed in the given frame
 	geometry_msgs::PointStamped targetPoint;
 	targetPoint.header.frame_id = "base_link";
-	targetPoint.point.x = 0.9;
-	targetPoint.point.y = 0;
-	targetPoint.point.z = 0.5;
+	targetPoint.point.x = Config::get()["setup"]["headTarget"]["x"].as<float>(0.9);
+	targetPoint.point.y = Config::get()["setup"]["headTarget"]["y"].as<float>(0.0);
+	targetPoint.point.z = Config::get()["setup"]["headTarget"]["z"].as<float>(0.5);
 
 	// make the kinect x axis point at the desired position
 	pr2_controllers_msgs::PointHeadGoal goal;
@@ -149,6 +155,14 @@ int main(int argc, char** argv)
 	// setup node
 	ros::init(argc, argv, "gazebo_pr2_setup");
 
+	// Load the node's configuration
+	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
+	if (!Config::load(GraspingUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+
+	// Load the displacement threshold from the configuration
+	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>(1.0);
+
 	// define publisher and subscriber for the base's movement
 	ros::NodeHandle handler;
 	ros::Publisher publisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
@@ -158,10 +172,17 @@ int main(int argc, char** argv)
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
 
-	liftUpTorso();
-	moveArms();
-	moveBase(publisher);
-	moveHead();
+	if (Config::get()["setup"]["liftTorso"].as<bool>())
+		liftUpTorso();
+
+	if (Config::get()["setup"]["moveArms"].as<bool>())
+		moveArms();
+
+	if (Config::get()["setup"]["moveBase"].as<bool>())
+		moveBase(publisher);
+
+	if (Config::get()["setup"]["moveHead"].as<bool>())
+		moveHead();
 
 	ROS_INFO("Setup routine completed");
 	ros::shutdown();

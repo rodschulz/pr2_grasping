@@ -10,6 +10,23 @@ bowLocation: 'src/grasping/config/bow200_1E-5.dat'
 # radius used for the normal vectors estimation
 normalEstimationRadius: -1
 
+##### setup node options #####
+setup:
+    liftTorso: false
+    moveArms: true
+    moveBase: false
+    moveHead: true
+
+    torsoPosition: 0.19
+
+    displacementThreshold: 1.0
+
+    armsPosition:
+      right: {x: 0.3, y: -0.5, z: 1.0}
+      left: {x: 0.3, y: 0.5, z: 1.0}
+
+    headTarget: {x: 0.9, y: 0.0, z: 0.5}
+
 ##### descriptor calculation params #####
 descriptor:
     patchSize: 0.02

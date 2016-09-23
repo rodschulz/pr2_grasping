@@ -25,7 +25,7 @@ struct PointXYZNL
 	uint32_t label;		// Add label
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW		// make sure our new allocators are aligned
-} EIGEN_ALIGN16;						// enforce SSE padding for correct memory alignment
+} EIGEN_ALIGN16;
 
 POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 									( float, x, x )
@@ -89,7 +89,7 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 }
 
 
-/***** Callback called when a new pointcloud received from the sensor *****/
+/***** Callback called when a new point cloud received from the sensor *****/
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 {
 	if (msg_->height == 0 || msg_->width == 0)
@@ -132,7 +132,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicObjectExtraction(sampled, transformation, debugEnabled);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, 0.615, debugEnabled);
 
 	static bool debugDone = false;
 	if (!debugDone && debugEnabled)
@@ -197,8 +197,8 @@ int main(int _argn, char **_argv)
 
 	// Load the node's configuration
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(CONFIG_LOCATION))
-		throw std::runtime_error((std::string) "Error reading config at " + Utils::getWorkingDirectory() + CONFIG_LOCATION);
+	if (!Config::load(GraspingUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
 	// Load the BoW definition and prepare the classificator
 	ROS_INFO("Training labeling classifier");

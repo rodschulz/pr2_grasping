@@ -139,7 +139,7 @@ set(APPS_LINKING_DEPENDENCIES
 
 # Target linking dependencies
 ### App nodes ###
-target_link_libraries(gazebo_pr2_setup ${catkin_LIBRARIES})
+target_link_libraries(gazebo_pr2_setup ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(gazebo_pr2_labeler ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasper ${APPS_LINKING_DEPENDENCIES})
 ### Example nodes ###
