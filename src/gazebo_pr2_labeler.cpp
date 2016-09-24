@@ -57,6 +57,7 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 	cv::sortIdx(labels_, indices, cv::SORT_EVERY_COLUMN + cv::SORT_ASCENDING);
 
 	// Generate the output cloud
+	int nlabels = 0;
 	int lastLabel = labels_.at<float>(indices.at<int>(0));
 	int lastLabelIndex = 0;
 	for (size_t i = 0; i < cloud_->size(); i++)
@@ -75,15 +76,20 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 		newPoint.label = label;
 		labeledCloud->push_back(newPoint);
 
-		if (debug_ && lastLabel != label)
+		if (lastLabel != label)
 		{
-			ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
 			lastLabel = label;
 			lastLabelIndex = i;
+			nlabels++;
+
+			if (debug_)
+				ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
 		}
 	}
 	if (debug_)
 		ROS_INFO(".....label %d, %zu pts", lastLabel, cloud_->size() - lastLabelIndex);
+
+	ROS_INFO(".....%d labels found", nlabels);
 
 	return labeledCloud;
 }
@@ -92,6 +98,7 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 /**************************************************/
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 {
+	static bool debugDone = false;
 	if (msg_->height == 0 || msg_->width == 0)
 	{
 		ROS_WARN("Empty cloud received (h=%d, w=%d), skipping", msg_->height, msg_->width);
@@ -132,9 +139,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled && !debugDone);
 
-	static bool debugDone = false;
 	if (!debugDone && debugEnabled)
 	{
 		pcl::io::savePCDFileASCII("./orig.pcd", *cloudXYZ);
@@ -198,7 +204,7 @@ int main(int argn_, char **argv_)
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
-	clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>(0.5);
+	clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
 
 	// Load the BoW definition and prepare the classificator
 	ROS_INFO("Training labeling classifier");

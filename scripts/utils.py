@@ -20,18 +20,31 @@ def getConfigPath():
 
 ##################################################
 def extractLabeledCloud(data_):
-	pts = 0
-	clouds = {}
+	npts = 0
+	points = {}
+	normals = {}
 
-	for p in pc.read_points(data_, skip_nans=True, field_names=('x', 'y', 'z', 'label')):
-		label = p[3]
-		if not label in clouds:
-			clouds[label] = []
+	xIdx = 0
+	yIdx = 1
+	zIdx = 2
+	nxIdx = 3
+	nyIdx = 4
+	nzIdx = 5
+	labelIdx = 6
 
-		clouds[label].append([p[0], p[1], p[2]])
-		pts = pts + 1
+	for p in pc.read_points(data_, skip_nans=True, field_names=('x', 'y', 'z', 'normal_x', 'normal_y', 'normal_z', 'label')):
+		label = p[labelIdx]
 
-	return [clouds, pts]
+		if not label in points:
+			points[label] = []
+			normals[label] = []
+
+		points[label].append([p[xIdx], p[yIdx], p[zIdx]])
+		normals[label].append([p[nxIdx], p[nyIdx], p[nzIdx]])
+
+		npts = npts + 1
+
+	return [points, normals, npts]
 
 
 ##################################################

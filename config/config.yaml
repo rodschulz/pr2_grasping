@@ -27,10 +27,10 @@ setup:
 ##### labeler node options #####
 labeler:
     clippingPlaneZ: 0.62
-    headTarget: {x: 0.9, y: 0.0, z: 0.5}
-    armsPosition:
-      right: {x: 0.3, y: -0.5, z: 1.0}
-      left: {x: 0.3, y: 0.5, z: 1.0}
+    # headTarget: {x: 0.9, y: 0.0, z: 0.5}
+    # armsPosition:
+    #   right: {x: 0.3, y: -0.5, z: 1.0}
+    #   left: {x: 0.3, y: 0.5, z: 1.0}
 
 ##### descriptor calculation params #####
 descriptor:

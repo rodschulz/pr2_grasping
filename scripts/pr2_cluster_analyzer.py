@@ -10,6 +10,9 @@ from sklearn.cluster import DBSCAN
 from sklearn import metrics
 
 
+import sys
+import os
+
 # Debug flag 
 debug = False
 # Object for publishing the grasping points 
@@ -17,7 +20,7 @@ publisher = None
 
 
 ##################################################
-def synthesizeGraspingPoints(data_, labels_, index_):
+def synthesizeGraspingPoints(points_, normals_, labels_, index_):
 	points = []
 
 	classes = set(labels_)
@@ -25,7 +28,7 @@ def synthesizeGraspingPoints(data_, labels_, index_):
 		if cls == -1:
 			continue
 
-		pts = data_[labels_ == cls]
+		pts = points_[labels_ == cls]
 		if len(pts) < 20 :
 			continue
 
@@ -44,22 +47,24 @@ def analyze(data_):
 	rp.loginfo('Cloud received')
 
 	# Extract data
-	clouds, npoints = utils.extractLabeledCloud(data_)
-	rp.loginfo('Retrieved %d pts', npoints)
+	clouds, normals, npts = utils.extractLabeledCloud(data_)
+	rp.loginfo('Retrieved %d pts', npts)
 
 	# Compute DBSCAN
 	graspPoints = []
-	minDataSize = 0.1 * npoints
+	minDataSize = 0.1 * npts
 	for key in clouds:
-		if len(clouds[key]) < minDataSize:
+		if (len(clouds[key]) < minDataSize) or (len(clouds[key]) < 10):
 			continue
 
 		# Get the actual data from the cloud
 		cloudData = np.array(clouds[key])
 
+
 		db = DBSCAN(eps=0.02, min_samples=20).fit(cloudData)
 		nclusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
 		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(cloudData), nclusters)
+
 
 		if nclusters > 0:
 			# Calculate the silhouette coeff only if there's more than 1 cluster
@@ -67,13 +72,15 @@ def analyze(data_):
 				rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(cloudData, db.labels_))
 
 			# Synthesize the grasping points
-			graspPoints = graspPoints + synthesizeGraspingPoints(data_=cloudData, labels_=db.labels_, index_=key)
+			normalsData = np.array(normals[key])
+			graspPoints = graspPoints + synthesizeGraspingPoints(points_=cloudData, normals_=normalsData, labels_=db.labels_, index_=key)
 
 			# Generate debug data if requested
 			if debug:
 				utils.plotData3D(data_=cloudData, labels_=db.labels_, index_=key, nclusters_=nclusters)
 
 	rp.loginfo('...finished')
+
 
 	# Publish the synthesized grasping points
 	dims = 4
