@@ -10,6 +10,12 @@
 #include <deque>
 #include "GraspingUtils.hpp"
 
+
+
+#include <pr2_grasping/GraspingPoint.h>
+
+
+
 #define PRINT_POSE(msg, point, frame)	ROS_INFO("..." msg "= (%.2f, %.2f, %.2f) - ref: %s", (point).x, (point).y, (point).z, (frame).c_str())
 
 
@@ -131,6 +137,18 @@ void timerCallback(const ros::TimerEvent& event)
 	}
 }
 
+void test(const pr2_grasping::GraspingPoint &msg_)
+{
+	ROS_INFO("Received:\n id=%s\np=(%f, %f, %f)\nn=(%f, %f, %f)",
+			 msg_.header.frame_id.c_str(),
+			 msg_.position.x,
+			 msg_.position.y,
+			 msg_.position.z,
+			 msg_.normal.x,
+			 msg_.normal.y,
+			 msg_.normal.z);
+}
+
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
@@ -149,7 +167,8 @@ int main(int _argn, char **_argv)
 
 	// Set the subscription to get the point clouds
 	ROS_INFO("Subscriber set");
-	ros::Subscriber sub = nodeHandler.subscribe("/pr2_grasping/grasping_points", 1, graspingPointsCallback);
+	// ros::Subscriber sub = nodeHandler.subscribe("/pr2_grasping/grasping_points", 1, graspingPointsCallback);
+	ros::Subscriber sub = nodeHandler.subscribe("/pr2_grasping/grasping_points2", 1, test);
 
 	// Keep looping
 	ROS_INFO("Grasper node looping");

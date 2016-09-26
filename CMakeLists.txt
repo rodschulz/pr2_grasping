@@ -22,9 +22,11 @@ endif()
 
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
+	message_generation
 	roscpp
 	rospy
 	std_msgs
+	geometry_msgs
 	nav_msgs
 	actionlib
 	pr2_controllers_msgs
@@ -54,6 +56,19 @@ message(STATUS "${Cyan}\tYAML_CPP_INCLUDE_DIR = ${YAML_CPP_INCLUDE_DIR}${ColorRe
 message(STATUS "${Yellow}Found Boost version ${Boost_LIB_VERSION}${ColorReset}")
 message(STATUS "${Cyan}\tBoost_INCLUDE_DIRS = ${Boost_INCLUDE_DIRS}${ColorReset}")
 
+# Add custom message files
+add_message_files(
+	FILES
+		GraspingPoint.msg
+)
+
+# Generate the custom messages
+generate_messages(
+	DEPENDENCIES
+		std_msgs
+		geometry_msgs
+)
+
 # Add relevant include directories
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
@@ -76,6 +91,7 @@ add_definitions("-Wall")
 ###################################
 catkin_package(
 	CATKIN_DEPENDS
+		message_runtime
 		roscpp
 		rospy
 		std_msgs

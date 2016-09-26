@@ -3,20 +3,21 @@ import yaml
 import utils
 import rospy as rp
 import numpy as np
+from sklearn import metrics
+from sklearn.cluster import DBSCAN
+from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import MultiArrayDimension
-from sensor_msgs.msg import PointCloud2
-from sklearn.cluster import DBSCAN
-from sklearn import metrics
 
 
-import sys
-import os
+from pr2_grasping.msg import GraspingPoint
+
 
 # Debug flag 
 debug = False
 # Object for publishing the grasping points 
 publisher = None
+publisher2 = None
 
 
 ##################################################
@@ -92,6 +93,19 @@ def analyze(data_):
 	publisher.publish(msg)
 
 
+	msg2 = GraspingPoint()
+	msg2.header.frame_id = 'base_footprint'
+	msg2.position.x = 1
+	msg2.position.y = 2
+	msg2.position.z = 3
+	msg2.normal.x = 0.1
+	msg2.normal.y = 0.2
+	msg2.normal.z = 0.3
+	publisher2.publish(msg2)
+
+
+
+
 ##################################################
 if __name__ == '__main__':
 	try:
@@ -102,6 +116,7 @@ if __name__ == '__main__':
 
 		# Initialize published topic
 		publisher = rp.Publisher('/pr2_grasping/grasping_points', Float32MultiArray, queue_size=2)
+		publisher2 = rp.Publisher('/pr2_grasping/grasping_points2', GraspingPoint, queue_size=10)
 
 		# Setup node name
 		rp.init_node('pr2_cluster_analyzer', anonymous=False)
