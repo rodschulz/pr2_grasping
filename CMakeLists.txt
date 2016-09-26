@@ -25,10 +25,10 @@ find_package(catkin REQUIRED COMPONENTS
 	message_generation
 	roscpp
 	rospy
+	actionlib
 	std_msgs
 	geometry_msgs
 	nav_msgs
-	actionlib
 	pr2_controllers_msgs
 	interactive_markers
 	moveit_core
@@ -60,6 +60,7 @@ message(STATUS "${Cyan}\tBoost_INCLUDE_DIRS = ${Boost_INCLUDE_DIRS}${ColorReset}
 add_message_files(
 	FILES
 		GraspingPoint.msg
+		GraspingPointArray.msg
 )
 
 # Generate the custom messages
@@ -94,9 +95,9 @@ catkin_package(
 		message_runtime
 		roscpp
 		rospy
+		actionlib
 		std_msgs
 		nav_msgs
-		actionlib
 		pr2_controllers_msgs
 		interactive_markers
 		moveit_core
