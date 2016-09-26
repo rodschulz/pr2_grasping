@@ -1,6 +1,6 @@
 ---
 # flag to enable/disable debug
-labelerDebug: true
+labelerDebug: false
 analyzerDebug: false
 
 
@@ -28,7 +28,7 @@ labeler:
     # sampling voxel size
     voxelSize: 0.005
     # location of the BoW file
-    bowLocation: 'src/grasping/config/bow200_c7_1E-5_opencv.dat'
+    bowLocation: 'src/grasping/config/bow200_c7_1E-5_kmeans.dat'
     # clipping plane position in Z axis
     clippingPlaneZ: 0.62
     # headTarget: {x: 0.9, y: 0.0, z: 0.5}
