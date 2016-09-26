@@ -22,8 +22,6 @@
 
 #define PACKAGE_NAME		"pr2_grasping"
 #define CONFIG_LOCATION		"config/config.yaml"
-#define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
-#define FRAME_BASE			"base_link"
 
 
 // Class implementing several utilities for the grasping node's routines

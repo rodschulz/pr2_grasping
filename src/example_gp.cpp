@@ -13,6 +13,7 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <shape_tools/solid_primitive_dims.h>
 #include "GraspingUtils.hpp"
+#include "RobotUtils.hpp"
 
 
 #define TARGET_OBJECT 		"target_object"
@@ -22,33 +23,7 @@
 typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
 
-
-enum Effector
-{
-	RIGHT_ARM,
-	LEFT_ARM
-};
-
-
 bool stopDisplacement = false;
-
-
-/**************************************************/
-std::pair<std::string, std::string> getEffectorNames(const Effector &arm_)
-{
-	switch (arm_)
-	{
-	default:
-		ROS_WARN("Wrong effector type, assuming right arm");
-
-	case RIGHT_ARM:
-		return std::pair<std::string, std::string>("right_arm", "right_eef");
-
-	case LEFT_ARM:
-		return std::pair<std::string, std::string>("left_arm", "left_eef");
-
-	}
-}
 
 
 /**************************************************/
@@ -89,7 +64,7 @@ void moveArmToPose(const Effector arm_,
 				   const geometry_msgs::Pose &targetPose_,
 				   const std::string &targetRef_)
 {
-	std::pair<std::string, std::string> effector = getEffectorNames(arm_);
+	std::pair<std::string, std::string> effector = RobotUtils::getEffectorNames(arm_);
 
 	// group to plane arm movement
 	moveit::planning_interface::MoveGroup arm(effector.first);

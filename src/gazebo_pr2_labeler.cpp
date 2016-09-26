@@ -13,6 +13,7 @@
 #include "Calculator.hpp"
 #include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
+#include "RobotUtils.hpp"
 #include "Writer.hpp"
 
 
@@ -42,7 +43,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 tf::TransformListener *tfListener;
 ros::Publisher pub;
 CvSVMPtr svm;
-float clippingPlaneZ = 0.615;
+float clippingPlaneZ = 0.5;
 
 
 /**************************************************/
