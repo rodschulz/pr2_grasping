@@ -110,7 +110,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 	/***** STAGE 1: retrieve data *****/
 	static bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
-	static float voxelSize = Config::get()["voxelSize"].as<float>();
+	static float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
 
 	// Convert cloud to PCL format
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ(new pcl::PointCloud<pcl::PointXYZ>());
@@ -185,7 +185,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	// Write debug data
 	if (!debugDone && debugEnabled)
 	{
-		Writer::writeClusteredCloud("./clustered.pcd", cloud, labels);
+		Writer::writeClusteredCloud("./cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII("./labeled.pcd", *labeledCloud);
 	}
 	debugDone = true; // generate debug only once
@@ -210,7 +210,7 @@ int main(int argn_, char **argv_)
 	ROS_INFO("Training labeling classifier");
 	cv::Mat BoW;
 	std::map<std::string, std::string> metadata;
-	Loader::loadMatrix(Config::get()["bowLocation"].as<std::string>(), BoW, &metadata);
+	Loader::loadMatrix(Config::get()["labeler"]["bowLocation"].as<std::string>(), BoW, &metadata);
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
 	// Begin spinner
@@ -221,8 +221,8 @@ int main(int argn_, char **argv_)
 	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
 
 	// Set the subscription to get the point clouds
-	// ros::Subscriber sub = nodeHandler.subscribe("/head_mount_kinect/depth/points", 1, cloudCallback);
-	ros::Subscriber sub = nodeHandler.subscribe("/move_group/filtered_cloud", 1, cloudCallback);
+	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
+	ros::Subscriber sub = nodeHandler.subscribe(topicName, 1, cloudCallback);
 
 	// Keep looping
 	ROS_INFO("Labeler node looping");
