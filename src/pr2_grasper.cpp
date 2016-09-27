@@ -21,35 +21,13 @@
 // Pointer to a move group interface
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 
-// // Structure to store a grasping point
-// struct GraspPt
-// {
-// 	geometry_msgs::Point point;
-// 	int label;
-
-// 	GraspPt(const float x_, const float y_, const float z_, const int label_)
-// 	{
-// 		point.x = x_;
-// 		point.y = y_;
-// 		point.z = z_;
-// 		label = label_;
-// 	}
-// };
-
 
 // Queue of grasping points
-// std::deque<GraspPt> queue;
 std::deque<pr2_grasping::GraspingPointArray> queue;
 // Max length allowed for the message queue
 unsigned int queueMaxsize = 5;
 // Mutex for concurrent access to the queue
 boost::mutex mutex;
-// // Manipulation group
-// MoveGroupPtr effector;
-// // Publisher for debug/inspection purposes
-// ros::Publisher posePublisher;
-// // TF listener for debug/inspection purposes
-// tf::TransformListener *tfListener;
 
 
 /**************************************************/
@@ -143,32 +121,18 @@ void tt(const ros::TimerEvent &event_, std::string _caca
 }
 
 
-
-void test2(const pr2_grasping::GraspingPointArrayConstPtr &msg_, const std::string xx)
-{
-	ROS_INFO("test callback %s", xx.c_str());
-
-	// ROS_INFO("Received array size %zu", msg_->data.size());
-	// for (size_t i = 0; i < msg_->data.size(); i++)
-	// {
-	// 	ROS_INFO("id=%s -- label:%d -- p=(%f, %f, %f) -- n=(%f, %f, %f)",
-	// 			 msg_->data[i].header.frame_id.c_str(),
-	// 			 msg_->data[i].label,
-	// 			 msg_->data[i].position.x,
-	// 			 msg_->data[i].position.y,
-	// 			 msg_->data[i].position.z,
-	// 			 msg_->data[i].normal.x,
-	// 			 msg_->data[i].normal.y,
-	// 			 msg_->data[i].normal.z);
-	// }
-}
-
+/**************************************************/
 void timerCallback(const ros::TimerEvent &event_,
 				   const MoveGroupPtr &effector_,
 				   const tf::TransformListener *tfListener_,
 				   const ros::Publisher &posePubslisher_)
-{}
+{
+	while (!queue.empty())
+	{}
+}
 
+
+/**************************************************/
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
