@@ -28,7 +28,7 @@ labeler:
     # sampling voxel size
     voxelSize: 0.005
     # location of the BoW file
-    bowLocation: 'src/grasping/config/bow200_c7_1E-5_kmeans.dat'
+    bowLocation: 'src/grasping/config/bow50_c7_1E-4_opencv.dat'
     # clipping plane position in Z axis
     clippingPlaneZ: 0.62
     # headTarget: {x: 0.9, y: 0.0, z: 0.5}
@@ -36,6 +36,13 @@ labeler:
     #   right: {x: 0.3, y: -0.5, z: 1.0}
     #   left: {x: 0.3, y: 0.5, z: 1.0}
 
+
+##### grasper node options #####
+grasper:
+    # arm used for grasping tasks
+    arm: right # right or left
+    # length allowed for the queue of GraspingPointArray messages
+    queueMaxsize: 1
 
 ########## descriptor params ##########
 
