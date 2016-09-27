@@ -7,6 +7,7 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/common/common.h>
 #include "Config.hpp"
 #include "Loader.hpp"
 #include "CloudUtils.hpp"
@@ -41,10 +42,28 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 
 /***** Global variables *****/
 tf::TransformListener *tfListener;
-ros::Publisher pub;
+ros::Publisher cloudPublisher, dataPublisher;
 CvSVMPtr svm;
 float clippingPlaneZ = 0.5;
 
+
+std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const std::string &frameId_)
+{
+	pcl::PointXYZ minPt, maxPt;
+	pcl::getMinMax3D<pcl::PointXYZ>(cloud_, minPt, maxPt);
+
+	geometry_msgs::PointStamped minLimit;
+	minLimit.x = minPt.x;
+	minLimit.y = minPt.y;
+	minLimit.z = minPt.z;
+
+	geometry_msgs::PointStamped maxLimit;
+	maxLimit.x = maxPt.x;
+	maxLimit.y = maxPt.y;
+	maxLimit.z = maxPt.z;
+
+	return std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped>(minLimit, maxLimit);
+}
 
 /**************************************************/
 pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
@@ -127,7 +146,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 	// Get the required transformation
 	tf::StampedTransform transformation;
-	while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_KINNECT, FRAME_BASE));
+	//while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_KINNECT, FRAME_BASE));
+	while (!GraspingUtils::getTransformation(transformation, tfListener, msg->header.frame_id, FRAME_BASE));
 
 	// Prepare cloud
 	CloudUtils::removeNANs(cloudXYZ);
@@ -141,6 +161,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled && !debugDone);
+	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(filtered, msg->header.frame_id);
 
 	if (!debugDone && debugEnabled)
 	{
@@ -176,11 +197,18 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	/***** STAGE 4: publish data *****/
 	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
 
-	sensor_msgs::PointCloud2 output;
-	pcl::toROSMsg<PointXYZNL>(*labeledCloud, output);
-	output.header.stamp = ros::Time::now();
-	output.header.frame_id = FRAME_KINNECT;
-	pub.publish(output);
+	sensor_msgs::PointCloud2 objectCloud;
+	pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
+	objectCloud.header.stamp = ros::Time::now();
+	objectCloud.header.frame_id = FRAME_KINNECT;
+
+	pr2_grasping::ObjectCloudData objectData;
+	objectData.cloud = objectCloud;
+	objectData.boundingBoxMin = limits.first;
+	objectData.boundingBoxMin = limits.second;
+
+	cloudPublisher.publish(objectCloud);
+	dataPublisher.publish(objectData);
 
 
 	// Write debug data
@@ -218,8 +246,9 @@ int main(int argn_, char **argv_)
 	ros::AsyncSpinner spinner(2);
 	spinner.start();
 
-	// Set the publisher
-	pub = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1);
+	// Set the publishers
+	cloudPublisher = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
+	dataPublisher = nodeHandler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
 
 	// Set the subscription to get the point clouds
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
