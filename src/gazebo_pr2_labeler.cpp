@@ -10,6 +10,7 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/common.h>
+#include <boost/bind.hpp>
 #include "Config.hpp"
 #include "Loader.hpp"
 #include "CloudUtils.hpp"
@@ -46,7 +47,6 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 tf::TransformListener *tfListener;
 ros::Publisher cloudPublisher, dataPublisher;
 CvSVMPtr svm;
-float clippingPlaneZ = 0.5;
 
 
 /**************************************************/
@@ -127,7 +127,10 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 
 
 /**************************************************/
-void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
+void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
+				   const float voxelSize_,
+				   const float clippingPlaneZ_,
+				   const bool debugEnabled_)
 {
 	static bool debugDone = false;
 	if (msg_->height == 0 || msg_->width == 0)
@@ -140,8 +143,6 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 
 	/***** STAGE 1: retrieve data *****/
-	static bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
-	static float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
 
 	// Convert cloud to PCL format
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ(new pcl::PointCloud<pcl::PointXYZ>());
@@ -169,12 +170,12 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	}
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
+	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled && !debugDone);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ_, debugEnabled_ && !debugDone);
 	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(filtered, msg_->header.frame_id);
 
-	if (!debugDone && debugEnabled)
+	if (!debugDone && debugEnabled_)
 	{
 		pcl::io::savePCDFileASCII("./orig.pcd", *cloudXYZ);
 		pcl::io::savePCDFileASCII("./filtered.pcd", *filtered);
@@ -206,7 +207,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 
 
 	/***** STAGE 4: publish data *****/
-	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled);
+	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled_);
 
 	sensor_msgs::PointCloud2 objectCloud;
 	pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
@@ -216,14 +217,14 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	pr2_grasping::ObjectCloudData objectData;
 	objectData.cloud = objectCloud;
 	objectData.boundingBoxMin = limits.first;
-	objectData.boundingBoxMin = limits.second;
+	objectData.boundingBoxMax = limits.second;
 
 	cloudPublisher.publish(objectCloud);
 	dataPublisher.publish(objectData);
 
 
 	// Write debug data
-	if (!debugDone && debugEnabled)
+	if (!debugDone && debugEnabled_)
 	{
 		Writer::writeClusteredCloud("./cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII("./labeled.pcd", *labeledCloud);
@@ -236,7 +237,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 int main(int argn_, char **argv_)
 {
 	ros::init(argn_, argv_, "gazebo_pr2_labeler");
-	ros::NodeHandle nodeHandler;
+	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
 	// Load the node's configuration
@@ -244,7 +245,12 @@ int main(int argn_, char **argv_)
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
-	clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
+
+	// Retrieve execution params
+	bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
+	float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
+	float clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
+
 
 	// Load the BoW definition and prepare the classificator
 	ROS_INFO("Training labeling classifier");
@@ -253,17 +259,21 @@ int main(int argn_, char **argv_)
 	Loader::loadMatrix(Config::get()["labeler"]["bowLocation"].as<std::string>(), BoW, &metadata);
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
+
 	// Begin spinner
 	ros::AsyncSpinner spinner(2);
 	spinner.start();
 
+
 	// Set the publishers
-	cloudPublisher = nodeHandler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
-	dataPublisher = nodeHandler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
+	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
+	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
+
 
 	// Set the subscription to get the point clouds
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
-	ros::Subscriber sub = nodeHandler.subscribe(topicName, 1, cloudCallback);
+	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled));
+
 
 	// Keep looping
 	ROS_INFO("Labeler node looping");

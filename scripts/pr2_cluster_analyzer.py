@@ -6,8 +6,10 @@ import numpy as np
 from sklearn import metrics
 from sklearn.cluster import DBSCAN
 from sensor_msgs.msg import PointCloud2
+from pr2_grasping.msg import GraspingData
 from pr2_grasping.msg import GraspingPoint
 from pr2_grasping.msg import GraspingPointArray
+from pr2_grasping.msg import ObjectCloudData
 
 
 # Debug flag 
@@ -50,11 +52,11 @@ def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 
 
 ##################################################
-def analyze(pointCloud_):
+def analyze(data_):
 	rp.loginfo('Cloud received')
 
 	# Extract data
-	points, normals, npts = utils.extractLabeledCloud(pointCloud_)
+	points, normals, npts = utils.extractLabeledCloud(data_.cloud)
 	rp.loginfo('Retrieved %d pts', npts)
 
 	# Compute DBSCAN
@@ -80,7 +82,7 @@ def analyze(pointCloud_):
 
 			# Synthesize the grasping points
 			normalsData = np.array(normals[key])
-			graspPts = graspPts + synthesizePoints(pointCloud_.header.frame_id, positionData, normalsData, db.labels_, key)
+			graspPts = graspPts + synthesizePoints(data_.cloud.header.frame_id, positionData, normalsData, db.labels_, key)
 
 			# Generate debug data if requested
 			if debug:
@@ -90,8 +92,10 @@ def analyze(pointCloud_):
 
 
 	# Publish the synthesized grasping points
-	msg = GraspingPointArray()
-	msg.data = graspPts
+	msg = GraspingData()
+	msg.graspingPoints = graspPts
+	msg.boundingBoxMin = data_.boundingBoxMin
+	msg.boundingBoxMax = data_.boundingBoxMax
 	publisher.publish(msg)
 
 
@@ -107,10 +111,10 @@ if __name__ == '__main__':
 		rp.init_node('pr2_cluster_analyzer', anonymous=False)
 
 		# Initialize published topic
-		publisher = rp.Publisher('/pr2_grasping/grasping_points', GraspingPointArray, queue_size=10)
+		publisher = rp.Publisher('/pr2_grasping/grasping_data', GraspingData, queue_size=10)
 
 		# Setup subscriber
-		rp.Subscriber('/pr2_grasping/labeled_cloud', PointCloud2, analyze)
+		rp.Subscriber('/pr2_grasping/object_cloud_data', ObjectCloudData, analyze)
 
 		# Spin until the node is stopped
 		rp.spin()

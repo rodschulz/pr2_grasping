@@ -2,6 +2,7 @@
 # flag to enable/disable debug
 labelerDebug: false
 analyzerDebug: false
+grasperDebug: false
 
 
 ##### setup node options #####
@@ -31,10 +32,6 @@ labeler:
     bowLocation: 'src/grasping/config/bow50_c7_1E-4_opencv.dat'
     # clipping plane position in Z axis
     clippingPlaneZ: 0.62
-    # headTarget: {x: 0.9, y: 0.0, z: 0.5}
-    # armsPosition:
-    #   right: {x: 0.3, y: -0.5, z: 1.0}
-    #   left: {x: 0.3, y: 0.5, z: 1.0}
 
 
 ##### grasper node options #####
@@ -43,6 +40,7 @@ grasper:
     arm: right # right or left
     # length allowed for the queue of GraspingPointArray messages
     queueMaxsize: 1
+
 
 ########## descriptor params ##########
 
