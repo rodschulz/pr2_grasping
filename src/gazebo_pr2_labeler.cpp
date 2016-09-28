@@ -4,6 +4,8 @@
  */
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/PointStamped.h>
+#include <pr2_grasping/ObjectCloudData.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -47,23 +49,32 @@ CvSVMPtr svm;
 float clippingPlaneZ = 0.5;
 
 
-std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const std::string &frameId_)
+/**************************************************/
+std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
+		const std::string &frameId_)
 {
 	pcl::PointXYZ minPt, maxPt;
-	pcl::getMinMax3D<pcl::PointXYZ>(cloud_, minPt, maxPt);
+	pcl::getMinMax3D<pcl::PointXYZ>(*cloud_, minPt, maxPt);
+
+	ros::Time nowStamp = ros::Time().now();
 
 	geometry_msgs::PointStamped minLimit;
-	minLimit.x = minPt.x;
-	minLimit.y = minPt.y;
-	minLimit.z = minPt.z;
+	minLimit.header.stamp = nowStamp;
+	minLimit.header.frame_id = frameId_;
+	minLimit.point.x = minPt.x;
+	minLimit.point.y = minPt.y;
+	minLimit.point.z = minPt.z;
 
 	geometry_msgs::PointStamped maxLimit;
-	maxLimit.x = maxPt.x;
-	maxLimit.y = maxPt.y;
-	maxLimit.z = maxPt.z;
+	maxLimit.header.stamp = nowStamp;
+	maxLimit.header.frame_id = frameId_;
+	maxLimit.point.x = maxPt.x;
+	maxLimit.point.y = maxPt.y;
+	maxLimit.point.z = maxPt.z;
 
 	return std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped>(minLimit, maxLimit);
 }
+
 
 /**************************************************/
 pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
@@ -147,7 +158,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	// Get the required transformation
 	tf::StampedTransform transformation;
 	//while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_KINNECT, FRAME_BASE));
-	while (!GraspingUtils::getTransformation(transformation, tfListener, msg->header.frame_id, FRAME_BASE));
+	while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
 
 	// Prepare cloud
 	CloudUtils::removeNANs(cloudXYZ);
@@ -161,7 +172,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize, sampled);
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ, debugEnabled && !debugDone);
-	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(filtered, msg->header.frame_id);
+	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(filtered, msg_->header.frame_id);
 
 	if (!debugDone && debugEnabled)
 	{

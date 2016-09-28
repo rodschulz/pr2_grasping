@@ -61,6 +61,7 @@ add_message_files(
 	FILES
 		GraspingPoint.msg
 		GraspingPointArray.msg
+		ObjectCloudData.msg
 )
 
 # Generate the custom messages
@@ -68,6 +69,7 @@ generate_messages(
 	DEPENDENCIES
 		std_msgs
 		geometry_msgs
+		sensor_msgs
 )
 
 # Add relevant include directories
