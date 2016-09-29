@@ -16,30 +16,22 @@
 #include "GraspingUtils.hpp"
 #include "RobotUtils.hpp"
 
-#include "ros/timer_options.h"
-
 
 #define TARGET_OBJECT		"target_object"
-// #define PRINT_POSE(msg, point, frame)	ROS_INFO("..." msg "= (%.2f, %.2f, %.2f) - ref: %s", (point).x, (point).y, (point).z, (frame).c_str())
 
 
 // Pointer to a move group interface
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 
 
-// Queue of grasping points
+/***** Global variables *****/
+ros::Publisher posePublisher;
 std::deque<pr2_grasping::GraspingData> queue;
-// Max length allowed for the message queue
 unsigned int queueMaxsize = 5;
-// Mutex for concurrent access to the queue
 boost::mutex mutex;
-// Margin used in the collision object generation
 float collisionMargin = 0.01;
-
-
-/** DEBUG ONLY **/
-ros::Publisher posearrayPublisher;
-/** DEBUG ONLY **/
+/***** Debug variables *****/
+ros::Publisher collisionPosePublisher;
 
 
 /**************************************************/
@@ -92,107 +84,43 @@ moveit_msgs::CollisionObject genCollisionObject(const std::string objectId_,
 
 
 /**************************************************/
-void tt(const ros::TimerEvent &event_, std::string _caca
-		//const MoveGroupPtr &effector_
-		//,
-		//tf::TransformListener *tfListener_
-		//,
-		//const ros::Publisher &posePublisher_
-	   )
-{
-	while (!queue.empty())
-	{
-		/**ROS_INFO("***** p=(%.2f, %.2f, %.2f) + l=%d *****", queue.front().point.x, queue.front().point.y, queue.front().point.z, queue.front().label);
-
-		std::string targetFrame = FRAME_BASE;
-		// effector->setEndEffector("right_eef");
-		effector->setPoseReferenceFrame(targetFrame);
-		ROS_INFO("...plan frame: %s - pose frame: %s", effector->getPlanningFrame().c_str(), effector->getPoseReferenceFrame().c_str());
-
-		// Generate the target pose
-		geometry_msgs::Pose target = GraspingUtils::genPose(0.546, 0.011, 0.77, DEG2RAD(45), 1, 1, 0);
-		//		geometry_msgs::Pose armPose = GraspingUtils::genPose(queue.front().x, queue.front().y, queue.front().z, DEG2RAD(225), 0, 1, 1);
-		//		armPose.position.x = queue.front().x;
-		//		armPose.position.y = queue.front().y;
-		//		armPose.position.z = queue.front().z;
-		//		armPose.orientation.w = 1.0;
-
-		// Print positions
-		geometry_msgs::PoseStamped current = effector->getCurrentPose();
-		PRINT_POSE("curr", current.pose.position, current.header.frame_id);
-		geometry_msgs::Point transformed = GraspingUtils::transformPose(tfListener, targetFrame, current.header.frame_id, current.pose.position);
-		PRINT_POSE("curr", transformed, targetFrame);
-		PRINT_POSE("tget", target.position, targetFrame);
-		transformed = GraspingUtils::transformPose(tfListener, current.header.frame_id, targetFrame, target.position);
-		PRINT_POSE("tget", transformed, current.header.frame_id);
-
-		// Publish the target pose so it can be visualized using RViz
-		geometry_msgs::PoseStamped msg;
-		msg.header.stamp = ros::Time::now();
-		msg.header.frame_id = targetFrame;
-		msg.pose = target;
-		posePublisher.publish(msg);
-
-		// Pop a point from the queue
-		mutex.lock();
-		queue.pop_front();
-		mutex.unlock();
-
-		effector->setPoseTarget(msg);
-
-		// Plan the trajectory
-		moveit::planning_interface::MoveGroup::Plan armPlan;
-		ROS_INFO("...planing effector trajectory");
-		bool planningOk = effector->plan(armPlan);
-		ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
-
-		// Move the effector
-		if (planningOk)
-		{
-			ROS_INFO("...moving right effector");
-			effector->move();
-			ROS_INFO("...effector movement completed");
-
-			current = effector->getCurrentPose();
-			PRINT_POSE("curr", current.pose.position, current.header.frame_id);
-			geometry_msgs::Point transformed = GraspingUtils::transformPose(tfListener, targetFrame, current.header.frame_id, current.pose.position);
-			PRINT_POSE("curr", transformed, targetFrame);
-		}
-		else
-			ROS_INFO("...movement aborted");**/
-	}
-}
-
-
-/**************************************************/
 void timerCallback(const ros::TimerEvent &event_,
 				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
 				   MoveGroupPtr &effector_,
 				   tf::TransformListener *tfListener_,
-				   ros::Publisher &posePubslisher_)
+				   const bool debugEnabled_)
 {
 	while (!queue.empty())
 	{
 		ROS_INFO("Processing grasping points");
 
 		/********** STAGE 1: add collisions to the planning scene **********/
+		ROS_INFO("...generating collision object");
 		geometry_msgs::PointStamped minPt = queue.front().boundingBoxMin;
 		geometry_msgs::PointStamped maxPt = queue.front().boundingBoxMax;
 
-		geometry_msgs::Point minTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, minPt.header.frame_id, minPt.point);
-		geometry_msgs::Point maxTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, maxPt.header.frame_id, maxPt.point);
+		// geometry_msgs::Point minTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, minPt.header.frame_id, minPt.point);
+		// geometry_msgs::Point maxTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, maxPt.header.frame_id, maxPt.point);
 
-		float dimX = maxTf.x - minTf.x + collisionMargin;
-		float dimY = maxTf.y - minTf.y + collisionMargin;
-		float dimZ = maxTf.z - minTf.z + collisionMargin;
+		// float dimX = maxTf.x - minTf.x + collisionMargin;
+		// float dimY = maxTf.y - minTf.y + collisionMargin;
+		// float dimZ = maxTf.z - minTf.z + collisionMargin;
 
-		// float dimX = maxPt.point.x - minPt.point.x + collisionMargin;
-		// float dimY = maxPt.point.y - minPt.point.y + collisionMargin;
-		// float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
+		float dimX = maxPt.point.x - minPt.point.x + collisionMargin;
+		float dimY = maxPt.point.y - minPt.point.y + collisionMargin;
+		float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
 
-		// geometry_msgs::Pose targetPose = GraspingUtils::genPose(minTf.x - dimX * 0.5, minTf.y + dimY * 0.5, minTf.z + dimZ * 0.5);
-		geometry_msgs::Pose targetPose = GraspingUtils::genPose(minTf.x, minTf.y, minTf.z);
-		moveit_msgs::CollisionObject targetCollision = genCollisionObject(TARGET_OBJECT, FRAME_BASE, targetPose, dimX, dimY, dimZ);
+		// geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minTf.x - dimX * 0.5, minTf.y + dimY * 0.5, minTf.z + dimZ * 0.5);
+		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minPt.x, minPt.y, minPt.z);
+		moveit_msgs::CollisionObject targetCollision = genCollisionObject(TARGET_OBJECT, FRAME_BASE, collisionPose, dimX, dimY, dimZ);
+
+		if (debugEnabled_)
+		{
+			geometry_msgs::PoseStamped collisionPoseMsg;
+			collisionPoseMsg.header.frame_id = FRAME_BASE;
+			collisionPoseMsg.pose = collisionPose;
+			collisionPosePublisher.publish(collisionPoseMsg);
+		}
 
 		std::vector<moveit_msgs::CollisionObject> collisions;
 		collisions.push_back(targetCollision);
@@ -202,21 +130,60 @@ void timerCallback(const ros::TimerEvent &event_,
 		ros::Duration(2.0).sleep();
 
 
-		/** DEBUG ONLY **/
-		geometry_msgs::PoseStamped msg;
-		msg.header.frame_id = FRAME_BASE;
-		msg.pose = targetPose;
-		posePubslisher_.publish(msg);
-
-		geometry_msgs::PoseArray array;
-		array.header.frame_id = minPt.header.frame_id;
-		array.poses.push_back(GraspingUtils::genPose(minPt.point.x, minPt.point.y, minPt.point.z));
-		array.poses.push_back(GraspingUtils::genPose(maxPt.point.x, maxPt.point.y, maxPt.point.z));
-		posearrayPublisher.publish(array);
-		/** DEBUG ONLY **/
-
-
 		/********** STAGE 2: generate grasp **********/
+		ROS_INFO("...generating grasp");
+
+		// geometry_msgs::PoseStamped graspPose;
+		// graspPose.header = targetPose_.header;
+		// graspPose.pose = GraspingUtils::genPose(targetPose_.pose.position.x,
+												// targetPose_.pose.position.y - 0.18,
+												// targetPose_.pose.position.z,
+												// DEG2RAD(90), 0, 0, 1);
+
+
+		// ROS_INFO("...publishing grasping pose");
+		// posePublisher_.publish(graspPose);
+
+
+		// moveit_msgs::Grasp grasp;
+		// grasp.id = "TARGET_GRASP";
+		// grasp.grasp_pose = graspPose;
+
+		// grasp.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
+		// grasp.pre_grasp_approach.direction.vector.x = 1;
+		// grasp.pre_grasp_approach.direction.vector.y = 0;
+		// grasp.pre_grasp_approach.direction.vector.z = 0;
+		// grasp.pre_grasp_approach.min_distance = 0.05;
+		// grasp.pre_grasp_approach.desired_distance = 0.18;
+
+
+		// grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+		// grasp.pre_grasp_posture.points.resize(1);
+		// grasp.pre_grasp_posture.points[0].positions.resize(1);
+		// grasp.pre_grasp_posture.points[0].positions[0] = 1;
+		// grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+
+
+		// grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+		// grasp.grasp_posture.points.resize(1);
+		// grasp.grasp_posture.points[0].positions.resize(1);
+		// grasp.grasp_posture.points[0].positions[0] = 0;
+		// grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+
+
+		// grasp.post_grasp_retreat.direction.header.frame_id = "base_footprint";
+		// grasp.post_grasp_retreat.direction.vector.x = 0;
+		// grasp.post_grasp_retreat.direction.vector.y = 0;
+		// grasp.post_grasp_retreat.direction.vector.z = 1;
+		// grasp.post_grasp_retreat.min_distance = 0.08;
+		// grasp.post_grasp_retreat.desired_distance = 0.3;
+
+		// grasp.allowed_touch_objects.clear();
+		// grasp.allowed_touch_objects.push_back(TARGET_OBJECT);
+		// grasp.allowed_touch_objects.push_back(SUPPORT_OBJECT);
+
+	
+	
 	}
 }
 
@@ -236,6 +203,7 @@ int main(int _argn, char **_argv)
 
 
 	// Get the max allowed size for the message queue
+	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
 	queueMaxsize = Config::get()["grasper"]["queueMaxsize"].as<unsigned int>();
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 
@@ -259,12 +227,15 @@ int main(int _argn, char **_argv)
 
 	// Set subscriptions
 	ROS_INFO("Setting publishers/subscribers");
-	ros::Publisher posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1);
+	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1);
 	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
-	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, posePublisher));
+	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
+	if (debugEnabled)
+	{
+		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1);
+	}
 
-	posearrayPublisher = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/pose_array", 1);
 
 	ros::waitForShutdown();
 	return EXIT_SUCCESS;
