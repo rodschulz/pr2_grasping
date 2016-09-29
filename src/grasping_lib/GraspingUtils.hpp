@@ -81,7 +81,7 @@ public:
 	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 			const tf::StampedTransform &transformation,
 			const float clippingZ_,
-			const bool debug_ = false)
+			pcl::PointCloud<pcl::PointXYZ>::Ptr &planeCloud_)
 	{
 		tf::Vector3 point = transformation * tf::Vector3(0, 0, clippingZ_);
 
@@ -93,16 +93,6 @@ public:
 		Eigen::Hyperplane<float, 3> clippingPlane = Eigen::Hyperplane<float, 3>(globalNormal, globalPoint);
 		Eigen::Hyperplane<float, 3>::Coefficients planeCoeffs = clippingPlane.coeffs();
 
-		if (debug_)
-		{
-			pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPlane = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-			for (float i = 0; i < 2; i += 0.1)
-				for (float j = 0; j < 2; j += 0.1)
-					cloudPlane->push_back(PointFactory::createPointXYZ(clippingPlane.projection(Eigen::Vector3f(i, j, 0))));
-
-			pcl::io::savePCDFileASCII("./trimming_plane.pcd", *cloudPlane);
-		}
-
 		// Get the filtered point indices
 		std::vector<int> clippedPoints, idxs;
 		pcl::PlaneClipper3D<pcl::PointXYZ> filter = pcl::PlaneClipper3D<pcl::PointXYZ>(planeCoeffs);
@@ -112,6 +102,15 @@ public:
 		pcl::PointCloud<pcl::PointXYZ>::Ptr filteredCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 		for (size_t i = 0; i < clippedPoints.size(); i++)
 			filteredCloud->push_back(cloud_->at(clippedPoints[i]));
+
+		// Generate a sample of the clipping plane output cloud if required
+		if (planeCloud_.get() != NULL)
+		{
+			planeCloud_.clear();
+			for (float i = -2; i < 2; i += 0.05)
+				for (float j = -2; j < 2; j += 0.05)
+					planeCloud_->push_back(PointFactory::createPointXYZ(clippingPlane.projection(Eigen::Vector3f(i, j, 0))));
+		}
 
 		return filteredCloud;
 	}
@@ -154,6 +153,7 @@ public:
 	}
 
 
+	// Generates a posture for the gripper's joints
 	static inline trajectory_msgs::JointTrajectory generateGraspPosture(const float value_,
 			const std::string gripperGroup_)
 	{
