@@ -5,6 +5,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseArray.h>
 #include <pr2_grasping/ObjectCloudData.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
@@ -47,6 +48,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 tf::TransformListener *tfListener;
 ros::Publisher cloudPublisher, dataPublisher;
 CvSVMPtr svm;
+/***** Debug variables *****/
+ros::Publisher limitsPublisher;
 
 
 /**************************************************/
@@ -158,7 +161,6 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 	// Get the required transformation
 	tf::StampedTransform transformation;
-	//while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_KINNECT, FRAME_BASE));
 	while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
 
 	// Prepare cloud
@@ -174,6 +176,16 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ_, debugEnabled_ && !debugDone);
 	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(filtered, msg_->header.frame_id);
+
+	if (debugEnabled_)
+	{
+		geometry_msgs::PoseArray array;
+		array.header.frame_id = msg_->header.frame_id;
+		array.poses.push_back(GraspingUtils::genPose(limits.first.point.x, limits.first.point.y, limits.first.point.z));
+		array.poses.push_back(GraspingUtils::genPose(limits.second.point.x, limits.second.point.y, limits.second.point.z));
+		limitsPublisher.publish(array);
+	}
+
 
 	if (!debugDone && debugEnabled_)
 	{
@@ -212,7 +224,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	sensor_msgs::PointCloud2 objectCloud;
 	pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
 	objectCloud.header.stamp = ros::Time::now();
-	objectCloud.header.frame_id = msg_->header.frame_id;//FRAME_KINNECT;
+	objectCloud.header.frame_id = msg_->header.frame_id;
 
 	pr2_grasping::ObjectCloudData objectData;
 	objectData.cloud = objectCloud;
@@ -268,6 +280,8 @@ int main(int argn_, char **argv_)
 	// Set the publishers
 	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
 	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
+
+	limitsPublisher = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/debug_limits", 1);
 
 
 	// Set the subscription to get the point clouds

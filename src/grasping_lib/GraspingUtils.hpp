@@ -38,7 +38,12 @@ public:
 
 
 	// Gets the transformation between the given reference systems
-	static inline bool getTransformation(tf::StampedTransform &transform_, const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const ros::Time &time_ = ros::Time::now(), const ros::Duration &timeout_ = ros::Duration(1.0))
+	static inline bool getTransformation(tf::StampedTransform &transform_,
+										 const tf::TransformListener *tfListener_,
+										 const std::string &target_,
+										 const std::string &source_,
+										 const ros::Time &time_ = ros::Time::now(),
+										 const ros::Duration &timeout_ = ros::Duration(1.0))
 	{
 		try
 		{
@@ -55,7 +60,10 @@ public:
 
 
 	// Transforms a pose between the given source and target reference frames
-	static inline geometry_msgs::Point transformPoint(const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const geometry_msgs::Point &point_)
+	static inline geometry_msgs::Point transformPoint(const tf::TransformListener *tfListener_,
+			const std::string &target_,
+			const std::string &source_,
+			const geometry_msgs::Point &point_)
 	{
 		tf::StampedTransform toTarget;
 		while (!GraspingUtils::getTransformation(toTarget, tfListener_, target_, source_));
@@ -70,7 +78,10 @@ public:
 
 
 	// Clips the given cloud using a plane at the given Z
-	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const tf::StampedTransform &transformation, const float clippingZ_, const bool debug_ = false)
+	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
+			const tf::StampedTransform &transformation,
+			const float clippingZ_,
+			const bool debug_ = false)
 	{
 		tf::Vector3 point = transformation * tf::Vector3(0, 0, clippingZ_);
 
@@ -107,7 +118,9 @@ public:
 
 
 	// Downsamples the given cloud
-	static inline void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_, const float voxelSize_, pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_)
+	static inline void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
+									   const float voxelSize_,
+									   pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_)
 	{
 		pcl::VoxelGrid<pcl::PointXYZ> grid;
 		grid.setInputCloud(cloud_);
@@ -117,7 +130,13 @@ public:
 
 
 	// Generates a pose structure with the given data
-	static inline geometry_msgs::Pose genPose(const float x_, const float y_, const float z_, const float theta_ = 0, const float dirx_ = 1, const float diry_ = 0, const float dirz_ = 0)
+	static inline geometry_msgs::Pose genPose(const float x_,
+			const float y_,
+			const float z_,
+			const float theta_ = 0,
+			const float dirx_ = 1,
+			const float diry_ = 0,
+			const float dirz_ = 0)
 	{
 		geometry_msgs::Pose pose;
 
@@ -135,7 +154,8 @@ public:
 	}
 
 
-	static inline trajectory_msgs::JointTrajectory generateGraspPosture(const float value_, const std::string gripperGroup_)
+	static inline trajectory_msgs::JointTrajectory generateGraspPosture(const float value_,
+			const std::string gripperGroup_)
 	{
 		trajectory_msgs::JointTrajectory posture;
 		moveit::planning_interface::MoveGroup gripper(gripperGroup_);
