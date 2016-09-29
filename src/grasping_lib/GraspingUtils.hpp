@@ -55,7 +55,7 @@ public:
 
 
 	// Transforms a pose between the given source and target reference frames
-	static inline geometry_msgs::Point transformPose(const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const geometry_msgs::Point &point_)
+	static inline geometry_msgs::Point transformPoint(const tf::TransformListener *tfListener_, const std::string &target_, const std::string &source_, const geometry_msgs::Point &point_)
 	{
 		tf::StampedTransform toTarget;
 		while (!GraspingUtils::getTransformation(toTarget, tfListener_, target_, source_));

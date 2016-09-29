@@ -56,7 +56,7 @@ std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingB
 	pcl::PointXYZ minPt, maxPt;
 	pcl::getMinMax3D<pcl::PointXYZ>(*cloud_, minPt, maxPt);
 
-	ros::Time nowStamp = ros::Time().now();
+	ros::Time nowStamp = ros::Time::now();
 
 	geometry_msgs::PointStamped minLimit;
 	minLimit.header.stamp = nowStamp;
@@ -212,7 +212,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	sensor_msgs::PointCloud2 objectCloud;
 	pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
 	objectCloud.header.stamp = ros::Time::now();
-	objectCloud.header.frame_id = FRAME_KINNECT;
+	objectCloud.header.frame_id = msg_->header.frame_id;//FRAME_KINNECT;
 
 	pr2_grasping::ObjectCloudData objectData;
 	objectData.cloud = objectCloud;

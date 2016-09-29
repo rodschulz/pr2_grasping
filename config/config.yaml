@@ -40,6 +40,8 @@ grasper:
     arm: right # right or left
     # length allowed for the queue of GraspingPointArray messages
     queueMaxsize: 1
+    # margin used for the collision object
+    collisionMargin: 0.05
 
 
 ########## descriptor params ##########
