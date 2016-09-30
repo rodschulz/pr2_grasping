@@ -25,7 +25,7 @@ setup:
 ##### labeler node options #####
 labeler:
     # point cloud input topic
-    pointcloudTopic: '/move_group/filtered_cloud' # '/head_mount_kinect/depth/points'
+    pointcloudTopic: '/head_mount_kinect/depth/points'
     # sampling voxel size
     voxelSize: 0.005
     # location of the BoW file
@@ -43,7 +43,7 @@ grasper:
     # length allowed for the queue of GraspingPointArray messages
     queueMaxsize: 1
     # margin used for the collision object
-    collisionMargin: 0.05
+    collisionMargin: 0.02
 
 
 ########## descriptor params ##########

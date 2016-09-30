@@ -98,28 +98,24 @@ void timerCallback(const ros::TimerEvent &event_,
 		geometry_msgs::PointStamped minPt = queue.front().boundingBoxMin;
 		geometry_msgs::PointStamped maxPt = queue.front().boundingBoxMax;
 
-		// geometry_msgs::Point minTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, minPt.header.frame_id, minPt.point);
-		// geometry_msgs::Point maxTf = GraspingUtils::transformPoint(tfListener_, FRAME_BASE, maxPt.header.frame_id, maxPt.point);
+		float colX = (minPt.point.x + maxPt.point.x) * 0.5;
+		float colY = (minPt.point.y + maxPt.point.y) * 0.5;
+		float colZ = (minPt.point.z + maxPt.point.z) * 0.5;
+		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(colX, colY, colZ);
 
-		// float dimX = maxTf.x - minTf.x + collisionMargin;
-		// float dimY = maxTf.y - minTf.y + collisionMargin;
-		// float dimZ = maxTf.z - minTf.z + collisionMargin;
+		if (debugEnabled_)
+		{
+			ROS_DEBUG("Publishing collision pose");
+			geometry_msgs::PoseStamped collisionPoseMsg;
+			collisionPoseMsg.header.frame_id = minPt.header.frame_id;
+			collisionPoseMsg.pose = collisionPose;
+			collisionPosePublisher.publish(collisionPoseMsg);
+		}
 
 		float dimX = maxPt.point.x - minPt.point.x + collisionMargin;
 		float dimY = maxPt.point.y - minPt.point.y + collisionMargin;
 		float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
-
-		// geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minTf.x - dimX * 0.5, minTf.y + dimY * 0.5, minTf.z + dimZ * 0.5);
-		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minPt.point.x, minPt.point.y, minPt.point.z);
 		moveit_msgs::CollisionObject targetCollision = genCollisionObject(TARGET_OBJECT, FRAME_BASE, collisionPose, dimX, dimY, dimZ);
-
-		if (debugEnabled_)
-		{
-			geometry_msgs::PoseStamped collisionPoseMsg;
-			collisionPoseMsg.header.frame_id = FRAME_BASE;
-			collisionPoseMsg.pose = collisionPose;
-			collisionPosePublisher.publish(collisionPoseMsg);
-		}
 
 		std::vector<moveit_msgs::CollisionObject> collisions;
 		collisions.push_back(targetCollision);
@@ -207,11 +203,6 @@ int main(int _argn, char **_argv)
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 
 
-	// Asynchronous spinning
-	ros::AsyncSpinner spinner(1); // Use 2 threads
-	spinner.start();
-
-
 	// For some reason this MUST be declared before using the group planning capabilities, otherwise
 	// collision objects won't be added to the planning interface (WTF)
 	moveit::planning_interface::PlanningSceneInterface planningScene;
@@ -232,10 +223,18 @@ int main(int _argn, char **_argv)
 
 	if (debugEnabled)
 	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
+
 		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1);
 	}
 
 
+	// Asynchronous spinning
+	ros::AsyncSpinner spinner(2); // Use 2 threads
+	spinner.start();
 	ros::waitForShutdown();
+
+
 	return EXIT_SUCCESS;
 }
