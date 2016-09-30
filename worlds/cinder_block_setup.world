@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.4">
-	<world name="default">
+	<world name="cinder_block_setup">
 		<!-- A global light source -->
 		<include>
 			<uri>model://sun</uri>
@@ -11,20 +11,27 @@
 		</include>
 		<!-- A table to hold things -->
 		<include>
-			<uri>model://cafe_table</uri>
+			<uri>model://low_table</uri>
 			<name>table</name>
-			<pose>2.0 0 0 0 0 0</pose>
+			<pose>1.4 0 0 0 0 0</pose>
 		</include>
 		<!-- A table to hold things -->
 		<include>
 			<uri>model://cinder_block</uri>
 			<name>block</name>
-			<pose>1.9 0 0.8 0 0 0</pose>
+			<pose>0.9 0 0.8 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->
 		<scene>
 			<shadows>0</shadows>
 		</scene>
+
+		<!-- Camera position -->
+		<gui>
+			<camera name="camera1">
+				<pose>2.6319 -1.80076 1.48357 0 0.292 2.4</pose>
+			</camera>
+		</gui>
 	</world>
 </sdf>
