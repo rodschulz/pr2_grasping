@@ -32,8 +32,8 @@ labeler:
     bowLocation: 'src/grasping/config/bow50_c7_1E-4_opencv.dat'
     # clipping plane position in Z axis
     clippingPlaneZ: 0.62
-    # indicates if the labeled cloud has to be written to disk (writes it once)
-    writeCloud: false
+    # indicates if the labeled and colored clouds have to be written to disk (writes it once)
+    writeClouds: false
 
 
 ##### grasper node options #####

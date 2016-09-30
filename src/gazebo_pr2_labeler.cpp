@@ -166,6 +166,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
 
 	// Prepare cloud
+	ROS_DEBUG("Removing NANs");
 	CloudUtils::removeNANs(cloudXYZ);
 	if (cloudXYZ->empty())
 	{
@@ -176,9 +177,11 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr() : pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
+	ROS_DEBUG("Clipping cloud");
+	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ_, clippingPlane);
 
+	ROS_DEBUG("Cloud clipped");
 	if (filtered->empty())
 	{
 		ROS_WARN("Cloud empty after filtering, skipping");
@@ -186,6 +189,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	}
 
 	// Transform the filtered cloud to base's frame
+	ROS_DEBUG("Transforming cloud from '%s' to '%s'", msg_->header.frame_id.c_str(), FRAME_BASE);
 	while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_BASE, msg_->header.frame_id));
 	pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
@@ -193,6 +197,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 	if (debugEnabled_)
 	{
+		ROS_DEBUG("Publishing debug data");
+
 		geometry_msgs::PoseArray arrayMsg;
 		arrayMsg.header.frame_id = limits.first.header.frame_id;
 		arrayMsg.poses.push_back(GraspingUtils::genPose(limits.first.point.x, limits.first.point.y, limits.first.point.z));
@@ -202,7 +208,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 		sensor_msgs::PointCloud2 planeMsg;
 		pcl::toROSMsg<pcl::PointXYZ>(*clippingPlane, planeMsg);
 		planeMsg.header.stamp = ros::Time::now();
-		planeMsg.header.frame_id = FRAME_BASE;
+		planeMsg.header.frame_id = msg_->header.frame_id;
 		planePublisher.publish(planeMsg);
 	}
 
@@ -238,6 +244,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	objectData.boundingBoxMin = limits.first;
 	objectData.boundingBoxMax = limits.second;
 
+	ROS_DEBUG("Publishing data");
 	cloudPublisher.publish(objectCloud);
 	dataPublisher.publish(objectData);
 
@@ -270,7 +277,7 @@ int main(int argn_, char **argv_)
 	bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
 	float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
 	float clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
-	bool writeClouds = Config::get()["writeClouds"].as<bool>();
+	bool writeClouds = Config::get()["labeler"]["writeClouds"].as<bool>();
 
 
 	// Load the BoW definition and prepare the classificator
@@ -292,6 +299,8 @@ int main(int argn_, char **argv_)
 
 	if (debugEnabled)
 	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
 		limitsPublisher = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/debug_limits", 1);
 		planePublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_clipping_plane", 1);
 	}
