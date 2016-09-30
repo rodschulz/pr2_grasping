@@ -9,6 +9,7 @@
 #include <pr2_grasping/ObjectCloudData.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
+#include <pcl_ros/impl/transforms.hpp>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/common.h>
@@ -175,7 +176,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(null) : pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
+	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr() : pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ_, clippingPlane);
 
 	if (filtered->empty())
@@ -187,7 +188,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 	// Transform the filtered cloud to base's frame
 	while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_BASE, msg_->header.frame_id));
 	pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
-	pcl_ros::transformPointCloud(filtered, transformed, transformation);
+	pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
 	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(transformed, FRAME_BASE);
 
 	if (debugEnabled_)
@@ -199,8 +200,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 		limitsPublisher.publish(arrayMsg);
 
 		sensor_msgs::PointCloud2 planeMsg;
-		pcl::toROSMsg<PointXYZNL>(*clippingPlane, planeMsg);
-		objectCloud.header.stamp = ros::Time::now();
+		pcl::toROSMsg<pcl::PointXYZ>(*clippingPlane, planeMsg);
+		planeMsg.header.stamp = ros::Time::now();
 		planeMsg.header.frame_id = FRAME_BASE;
 		planePublisher.publish(planeMsg);
 	}
@@ -242,7 +243,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 
 	// Write debug data
-	static cloudsWritten = false;
+	static bool cloudsWritten = false;
 	if (!cloudsWritten && writeClouds_)
 	{
 		Writer::writeClusteredCloud("./cluster_colored.pcd", cloud, labels);

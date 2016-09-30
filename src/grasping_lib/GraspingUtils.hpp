@@ -106,7 +106,7 @@ public:
 		// Generate a sample of the clipping plane output cloud if required
 		if (planeCloud_.get() != NULL)
 		{
-			planeCloud_.clear();
+			planeCloud_->clear();
 			for (float i = -2; i < 2; i += 0.05)
 				for (float j = -2; j < 2; j += 0.05)
 					planeCloud_->push_back(PointFactory::createPointXYZ(clippingPlane.projection(Eigen::Vector3f(i, j, 0))));

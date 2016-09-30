@@ -19,10 +19,8 @@
 
 #define TARGET_OBJECT		"target_object"
 
-
 // Pointer to a move group interface
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
-
 
 /***** Global variables *****/
 ros::Publisher posePublisher;
@@ -30,6 +28,7 @@ std::deque<pr2_grasping::GraspingData> queue;
 unsigned int queueMaxsize = 5;
 boost::mutex mutex;
 float collisionMargin = 0.01;
+
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher;
 
@@ -111,7 +110,7 @@ void timerCallback(const ros::TimerEvent &event_,
 		float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
 
 		// geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minTf.x - dimX * 0.5, minTf.y + dimY * 0.5, minTf.z + dimZ * 0.5);
-		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minPt.x, minPt.y, minPt.z);
+		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(minPt.point.x, minPt.point.y, minPt.point.z);
 		moveit_msgs::CollisionObject targetCollision = genCollisionObject(TARGET_OBJECT, FRAME_BASE, collisionPose, dimX, dimY, dimZ);
 
 		if (debugEnabled_)
@@ -136,9 +135,9 @@ void timerCallback(const ros::TimerEvent &event_,
 		// geometry_msgs::PoseStamped graspPose;
 		// graspPose.header = targetPose_.header;
 		// graspPose.pose = GraspingUtils::genPose(targetPose_.pose.position.x,
-												// targetPose_.pose.position.y - 0.18,
-												// targetPose_.pose.position.z,
-												// DEG2RAD(90), 0, 0, 1);
+		// targetPose_.pose.position.y - 0.18,
+		// targetPose_.pose.position.z,
+		// DEG2RAD(90), 0, 0, 1);
 
 
 		// ROS_INFO("...publishing grasping pose");
@@ -182,8 +181,8 @@ void timerCallback(const ros::TimerEvent &event_,
 		// grasp.allowed_touch_objects.push_back(TARGET_OBJECT);
 		// grasp.allowed_touch_objects.push_back(SUPPORT_OBJECT);
 
-	
-	
+
+
 	}
 }
 
