@@ -2,7 +2,7 @@
 # flag to enable/disable debug
 labelerDebug: false
 analyzerDebug: false
-grasperDebug: false
+grasperDebug: true
 
 
 ##### setup node options #####
@@ -27,7 +27,7 @@ labeler:
     # point cloud input topic
     pointcloudTopic: '/head_mount_kinect/depth/points'
     # sampling voxel size
-    voxelSize: 0.005
+    voxelSize: 0.004
     # location of the BoW file
     bowLocation: 'src/grasping/config/bow50_c7_1E-4_opencv.dat'
     # clipping plane position in Z axis
@@ -44,6 +44,8 @@ grasper:
     queueMaxsize: 1
     # margin used for the collision object
     collisionMargin: 0.02
+    # gap between object and effector at the begin of the grasping
+    graspPadding: 0.1
 
 
 ########## descriptor params ##########
