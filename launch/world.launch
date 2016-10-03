@@ -4,7 +4,7 @@
 	<arg name="paused" default="false"/>
 
 	<!-- use this argument to use different worlds for the experimental setup -->
-	<arg name="world" default="beer"/>
+	<arg name="world" default="thin_beer"/>
 
 	<!-- include world launch file -->
 	<include file="$(find gazebo_ros)/launch/empty_world.launch">

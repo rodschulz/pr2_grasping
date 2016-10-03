@@ -4,7 +4,7 @@
 	<arg name="paused" default="false"/>
 
 	<!-- use this argument to use different worlds for the experimental setup -->
-	<arg name="world" default="beer"/>
+	<arg name="world" default="thin_beer"/>
 
 	<!-- launch ros core and world setup -->
 	<include file="$(find pr2_grasping)/launch/world.launch">
