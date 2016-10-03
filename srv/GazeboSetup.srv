@@ -1,4 +1,5 @@
-# No parameters needed for the setup request
+# Flag indicating the target object has to be re-spawned (true) or not (false)
+bool respawnObject
 ---
-# Boolean flag indicating if the setup routine was performed successfully
+# Flag indicating if the setup routine was performed successfully
 bool result
