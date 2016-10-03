@@ -18,7 +18,7 @@
 		<!-- A table to hold things -->
 		<include>
 			<uri>model://cinder_block</uri>
-			<name>block</name>
+			<name>cinder_block</name>
 			<pose>0.9 0 0.8 0 0 0</pose>
 		</include>
 
