@@ -65,6 +65,12 @@ add_message_files(
 		ObjectCloudData.msg
 )
 
+# Add custom service files
+add_service_files(
+	FILES
+		GazeboSetup.srv
+)
+
 # Generate the custom messages
 generate_messages(
 	DEPENDENCIES

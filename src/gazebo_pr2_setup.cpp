@@ -11,19 +11,22 @@
 #include <pr2_controllers_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <pr2_grasping/GazeboSetup.h>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
 
 
+/***** Client types definitions *****/
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> HeadClient;
 
 
-// flag to coordinate the displacement detention
+/***** Global variables *****/
 bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 
 
+/**************************************************/
 void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 {
 	if (!stopDisplacement && msg_->pose.pose.position.x >= displacementThreshold)
@@ -33,6 +36,8 @@ void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 	}
 }
 
+
+/**************************************************/
 void liftUpTorso()
 {
 	// define action client
@@ -56,6 +61,8 @@ void liftUpTorso()
 	ROS_INFO("...torso lifted up");
 }
 
+
+/**************************************************/
 void moveArms()
 {
 	ROS_INFO("Preparing arms setup");
@@ -98,6 +105,8 @@ void moveArms()
 	ROS_INFO("...arms movement completed");
 }
 
+
+/**************************************************/
 void moveBase(ros::Publisher &publisher_)
 {
 	ROS_INFO("Moving robot base");
@@ -113,6 +122,8 @@ void moveBase(ros::Publisher &publisher_)
 	ROS_INFO("...displacement completed");
 }
 
+
+/**************************************************/
 void moveHead()
 {
 	// define action client
@@ -150,6 +161,34 @@ void moveHead()
 	ROS_INFO("...head moved");
 }
 
+
+/**************************************************/
+bool runSetup(pr2_grasping::GazeboSetup::Request  &request_,
+			  pr2_grasping::GazeboSetup::Response &response_)
+{
+	ROS_INFO("Beginning gazebo setup routine");
+
+	if (Config::get()["setup"]["liftTorso"].as<bool>())
+		liftUpTorso();
+
+	if (Config::get()["setup"]["moveArms"].as<bool>())
+		moveArms();
+
+	ros::Publisher publisher;//fix this
+	if (Config::get()["setup"]["moveBase"].as<bool>())
+		moveBase(publisher);
+
+	if (Config::get()["setup"]["moveHead"].as<bool>())
+		moveHead();
+
+	ROS_INFO("Gazebo setup routine completed");
+	response_.result = true;
+
+	return true;
+}
+
+
+/**************************************************/
 int main(int argn_, char** argv_)
 {
 	// setup node
@@ -168,24 +207,13 @@ int main(int argn_, char** argv_)
 	ros::Publisher publisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
 	ros::Subscriber subscriber = handler.subscribe("/base_pose_ground_truth", 1, displacementCallback);
 
-	ROS_INFO("Beginning setup routine");
-	ros::AsyncSpinner spinner(1);
+	// Service for setup configuration
+	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
+
+	ROS_INFO("Starting setup service");
+	ros::AsyncSpinner spinner(2);
 	spinner.start();
-
-	if (Config::get()["setup"]["liftTorso"].as<bool>())
-		liftUpTorso();
-
-	if (Config::get()["setup"]["moveArms"].as<bool>())
-		moveArms();
-
-	if (Config::get()["setup"]["moveBase"].as<bool>())
-		moveBase(publisher);
-
-	if (Config::get()["setup"]["moveHead"].as<bool>())
-		moveHead();
-
-	ROS_INFO("Setup routine completed");
-	ros::shutdown();
+	ros::waitForShutdown();
 
 	return EXIT_SUCCESS;
 }

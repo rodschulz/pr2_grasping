@@ -1,0 +1,4 @@
+# No parameters needed for the setup request
+---
+# Boolean flag indicating if the setup routine was performed successfully
+bool result
