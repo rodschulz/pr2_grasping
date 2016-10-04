@@ -6,6 +6,7 @@
 #include <tf/transform_listener.h>
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
+#include <pr2_grasping/GazeboSetup.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/move_group_interface/move_group.h>
@@ -100,9 +101,7 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 	geometry_msgs::PoseStamped pose;
 	pose.header = point_.header;
-	pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(),
-									   DEG2RAD(0),
-									   point_.normal.x, point_.normal.y, point_.normal.z);
+	pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(0), n.x(), n.y(), n.z());
 
 	return pose;
 }
@@ -146,16 +145,18 @@ void timerCallback(const ros::TimerEvent &event_,
 		std::vector<moveit_msgs::CollisionObject> collisions;
 		collisions.push_back(targetCollision);
 
-		ROS_INFO("...adding collisions to scene");
-		planningScene_->addCollisionObjects(collisions);
-		ros::Duration(2.0).sleep();
-
 
 		/********** STAGE 2: generate grasp **********/
 		size_t npoints = queue.front().graspingPoints.size();
 		for (size_t i = 0; i < npoints; i++)
 		{
 			ROS_INFO("*** processing point %zu of %zu ***", i + 1, npoints);
+
+			ROS_INFO("...adding collisions to scene");
+			planningScene_->addCollisionObjects(collisions);
+			ros::Duration(2.0).sleep();
+
+			ROS_DEBUG("Generating grasping point");
 			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
 			geometry_msgs::PoseStamped graspingPose = genGraspingPose(point);
 
@@ -169,7 +170,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			}
 
 
-			ROS_INFO("...publishing grasping pose");
+			ROS_DEBUG("Publishing grasping pose");
 			posePublisher.publish(graspingPose);
 
 
@@ -269,6 +270,17 @@ int main(int _argn, char **_argv)
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
 
+
+	ROS_INFO("Calling setup service");
+	ros::ServiceClient setupService = handler.serviceClient<pr2_grasping::GazeboSetup>("/pr2_grasping/gazebo_setup");
+	pr2_grasping::GazeboSetup srv;
+	if (setupService.call(srv))
+		ROS_INFO("Setup succeeded: %s", srv.response.result ? "TRUE" : "FALSE");
+	ROS_INFO("After setup service call");
+
+
+
+
 	// For some reason this MUST be declared before using the group planning capabilities, otherwise
 	// collision objects won't be added to the planning interface (WTF)
 	moveit::planning_interface::PlanningSceneInterface planningScene;
@@ -284,7 +296,7 @@ int main(int _argn, char **_argv)
 
 	// Set subscriptions
 	ROS_INFO("Setting publishers/subscribers");
-	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1);
+	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
 	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
@@ -293,8 +305,8 @@ int main(int _argn, char **_argv)
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
-		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1);
-		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1);
+		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
+		graspingPointPublisher = handler.advertise<geometry_msgs::PointStamped>("/pr2_grasping/debug_grasping_point", 1, true);
 	}
 
 
