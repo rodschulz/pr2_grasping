@@ -30,6 +30,7 @@ bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
 std::map<std::string, bool> ignoreMap;
+std::map<std::string, gazebo_msgs::GetModelStateResponse> initialState
 
 
 /**************************************************/
@@ -251,7 +252,7 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  &request_,
 /**************************************************/
 void storeInitialWorldState()
 {
-
+	
 }
 
 
@@ -271,6 +272,13 @@ int main(int argn_, char** argv_)
 	std::vector<std::string> list = Config::get()["setup"]["ignoreList"].as<std::vector<std::string> >();
 	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
 		ignoreMap[*it] = true;
+
+	// Retrieve the world's initial state
+	if (!GazeboUtils::getWorldState(initialState, ignoreMap))
+	{
+		ROS_ERROR("Unnable to retrieve initial world state");
+		throw std::runtime_error("Unnable to retrieve initial world state");
+	}
 
 	// Publisher and subscriber for base's movement
 	ros::NodeHandle handler;
