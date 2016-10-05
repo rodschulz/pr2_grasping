@@ -6,6 +6,7 @@
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
+#include <gazebo_msgs/GetModelStateResponse.h>
 // #include <gazebo_msgs/GetWorldProperties.h>
 // #include <gazebo_msgs/DeleteModel.h>
 // #include <gazebo_msgs/SpawnModel.h>
@@ -30,7 +31,7 @@ bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
 std::map<std::string, bool> ignoreMap;
-std::map<std::string, gazebo_msgs::GetModelStateResponse> initialState
+std::map<std::string, gazebo_msgs::GetModelStateResponse> initialState;
 
 
 /**************************************************/
@@ -174,46 +175,46 @@ void moveHead()
 /**************************************************/
 bool respawnObject()
 {
-	std::vector<std::string> objects2;
-	GazeboUtils::getWorldObjects(objects2, ignoreMap);
+// 	std::vector<std::string> objects2;
+// 	GazeboUtils::getWorldObjects(objects2, ignoreMap);
 
-	gazebo_msgs::GetWorldProperties props;
-	if (ros::service::call("/gazebo/get_world_properties", props))
-	{
-		// Extract the objects to re-spawn
-		std::vector<std::string> objects;
-		for (std::vector<std::string>::const_iterator it = props.response.model_names.begin(); it != props.response.model_names.end(); it++)
-		{
-			if (ignoreMap.find(*it) == ignoreMap.end())
-				objects.push_back(*it);
-			else
-				ROS_DEBUG("Ignoring object %s", it->c_str());
-		}
+// 	gazebo_msgs::GetWorldProperties props;
+// 	if (ros::service::call("/gazebo/get_world_properties", props))
+// 	{
+// 		// Extract the objects to re-spawn
+// 		std::vector<std::string> objects;
+// 		for (std::vector<std::string>::const_iterator it = props.response.model_names.begin(); it != props.response.model_names.end(); it++)
+// 		{
+// 			if (ignoreMap.find(*it) == ignoreMap.end())
+// 				objects.push_back(*it);
+// 			else
+// 				ROS_DEBUG("Ignoring object %s", it->c_str());
+// 		}
 
-		// Re-spawn the extracted objects
-		for (std::vector<std::string>::const_iterator it = objects.begin(); it != objects.end(); it++)
-		{
-			ROS_INFO("Re-spawning %s", it->c_str());
+// 		// Re-spawn the extracted objects
+// 		for (std::vector<std::string>::const_iterator it = objects.begin(); it != objects.end(); it++)
+// 		{
+// 			ROS_INFO("Re-spawning %s", it->c_str());
 
-			// Remove model
-			gazebo_msgs::DeleteModel remove;
-			remove.request.model_name = *it;
-			if (ros::service::call("/gazebo/delete_model", remove))
-			{
-				ROS_DEBUG("...model delete %s", remove.response.success ? "SUCCESSFUL" : "FAILED");
-				if (!remove.response.success)
-					return false;
-			}
+// 			// Remove model
+// 			gazebo_msgs::DeleteModel remove;
+// 			remove.request.model_name = *it;
+// 			if (ros::service::call("/gazebo/delete_model", remove))
+// 			{
+// 				ROS_DEBUG("...model delete %s", remove.response.success ? "SUCCESSFUL" : "FAILED");
+// 				if (!remove.response.success)
+// 					return false;
+// 			}
 
-			// Spawn new model
-			gazebo_msgs::SpawnModel spawn;
-			spawn.request.model_name = *it;
-			spawn.request.model_xml = "2";
-			if (ros::service::call("/gazebo/delete_model", spawn))
-				ROS_DEBUG("...model spawn %s", spawn.response.success ? "SUCCESSFUL" : "FAILED");
+// 			// Spawn new model
+// 			gazebo_msgs::SpawnModel spawn;
+// 			spawn.request.model_name = *it;
+// 			spawn.request.model_xml = "2";
+// 			if (ros::service::call("/gazebo/delete_model", spawn))
+// 				ROS_DEBUG("...model spawn %s", spawn.response.success ? "SUCCESSFUL" : "FAILED");
 
-		}
-	}
+// 		}
+// 	}
 
 	return true;
 }
@@ -250,13 +251,6 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  &request_,
 
 
 /**************************************************/
-void storeInitialWorldState()
-{
-	
-}
-
-
-/**************************************************/
 int main(int argn_, char** argv_)
 {
 	// setup node
@@ -273,13 +267,6 @@ int main(int argn_, char** argv_)
 	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
 		ignoreMap[*it] = true;
 
-	// Retrieve the world's initial state
-	if (!GazeboUtils::getWorldState(initialState, ignoreMap))
-	{
-		ROS_ERROR("Unnable to retrieve initial world state");
-		throw std::runtime_error("Unnable to retrieve initial world state");
-	}
-
 	// Publisher and subscriber for base's movement
 	ros::NodeHandle handler;
 	cmdPublisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
@@ -287,6 +274,74 @@ int main(int argn_, char** argv_)
 
 	// Service for setup configuration
 	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
+
+
+
+
+	ROS_INFO("===============");
+	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
+		ROS_INFO("%s", it->c_str());
+
+
+	ROS_INFO("+++++++++++++++");
+	std::vector<std::string> models;
+	if (!GazeboUtils::getSpawnedModels(models))
+		ROS_INFO("Failed to get spawned models");
+	for (std::vector<std::string>::const_iterator it = models.begin(); it != models.end(); it++)
+		ROS_INFO("%s", it->c_str());
+
+
+	ROS_INFO("***************");
+	GazeboUtils::getSpawnedModels(models, ignoreMap);
+	for (std::vector<std::string>::const_iterator it = models.begin(); it != models.end(); it++)
+		ROS_INFO("%s", it->c_str());
+
+
+	ROS_INFO("###############");
+	gazebo_msgs::GetModelState::Response state1;
+	if (!GazeboUtils::getModelState("thin_beer", state1))
+		ROS_INFO("Failed to get spawned models");
+	ROS_INFO_STREAM(state1.pose);
+
+
+	ROS_INFO("@@@@@@@@@@@@@@@");
+	std::map<std::string, gazebo_msgs::GetModelStateResponse> state2;
+	if (!GazeboUtils::getWorldState(state2))
+		ROS_INFO("Failed to get world state");
+	ROS_INFO_STREAM(state2["table"].pose);
+	ROS_INFO_STREAM(state2["pr2"].pose);
+	ROS_INFO_STREAM(state2["thin_beer"].pose);
+
+
+	// ROS_INFO(">>>>>>>>>>>>>>>");
+	// if (!GazeboUtils::deleteModel("table"))
+	// 	ROS_INFO("Failed to get world state");
+	// ros::Duration(1.0).sleep();
+	// if (!GazeboUtils::deleteModel("thin_beer"))
+	// 	ROS_INFO("Failed to get world state");
+	// ros::Duration(1.0).sleep();
+
+
+	ROS_INFO("???????????????");
+	gazebo_msgs::GetModelStateResponse rr;
+	rr.pose.position.x = 1;
+	rr.pose.position.z = 0.5;
+	if (!GazeboUtils::spawnModel("hammer", "/home/rodrigo/.gazebo/models/hammer/model-1_4.sdf", rr))
+		ROS_INFO("Failed to get world state");
+	ros::Duration(1.0).sleep();
+
+
+	ROS_INFO("]]]]]]]]]]]]]]]");
+
+
+	// Retrieve the world's initial state
+	// if (!GazeboUtils::getWorldState(initialState, ignoreMap))
+	// {
+	// 	ROS_ERROR("Unnable to retrieve initial world state");
+	// 	throw std::runtime_error("Unnable to retrieve initial world state");
+	// }
+
+
 
 	ROS_INFO("Starting setup service");
 	ros::AsyncSpinner spinner(2);
