@@ -1,5 +1,5 @@
-# Flag indicating the target object has to be re-spawned (true) or not (false)
-bool respawnObject
+# Indicates that target object's pose has to be reset (true) or not (false)
+bool resetObject
 ---
-# Flag indicating if the setup routine was performed successfully
+# Indicates if the setup routine was performed successfully (true) or not (false)
 bool result
