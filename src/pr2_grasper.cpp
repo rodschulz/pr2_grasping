@@ -7,6 +7,7 @@
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/GazeboSetup.h>
+#include <pr2_grasping/GazeboLabeler.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/move_group_interface/move_group.h>
@@ -27,9 +28,9 @@ typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 
 /***** Global variables *****/
 ros::Publisher posePublisher;
+boost::mutex mutex;
 std::deque<pr2_grasping::GraspingData> queue;
 unsigned int queueMaxsize = 5;
-boost::mutex mutex;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 
@@ -108,6 +109,56 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 
 /**************************************************/
+moveit_msgs::Grasp genGrasp(const std::string &graspId_, const std::string &referenceFrame_, const geometry_msgs::PoseStamped &graspingPose_, const std::string &targetObject_)
+{
+	moveit_msgs::Grasp grasp;
+	grasp.id = graspId_;
+	grasp.grasp_pose = graspingPose_;
+
+	grasp.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
+	grasp.pre_grasp_approach.direction.vector.x = 1;
+	grasp.pre_grasp_approach.direction.vector.y = 0;
+	grasp.pre_grasp_approach.direction.vector.z = 0;
+	grasp.pre_grasp_approach.min_distance = 0.05;
+	grasp.pre_grasp_approach.desired_distance = 0.18;
+
+
+	grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+	grasp.pre_grasp_posture.points.resize(1);
+	grasp.pre_grasp_posture.points[0].positions.resize(1);
+	grasp.pre_grasp_posture.points[0].positions[0] = 1;
+	grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+
+
+	grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+	grasp.grasp_posture.points.resize(1);
+	grasp.grasp_posture.points[0].positions.resize(1);
+	grasp.grasp_posture.points[0].positions[0] = 0;
+	grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+
+
+	grasp.post_grasp_retreat.direction.header.frame_id = referenceFrame_;
+	grasp.post_grasp_retreat.direction.vector.x = 0;
+	grasp.post_grasp_retreat.direction.vector.y = 0;
+	grasp.post_grasp_retreat.direction.vector.z = 1;
+	grasp.post_grasp_retreat.min_distance = 0.08;
+	grasp.post_grasp_retreat.desired_distance = 0.3;
+
+	grasp.allowed_touch_objects.clear();
+	grasp.allowed_touch_objects.push_back(targetObject_);
+
+	return grasp;
+}
+
+
+/**************************************************/
+bool checkGraspResult()
+{
+	return true;
+}
+
+
+/**************************************************/
 void timerCallback(const ros::TimerEvent &event_,
 				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
 				   MoveGroupPtr &effector_,
@@ -116,9 +167,12 @@ void timerCallback(const ros::TimerEvent &event_,
 {
 	while (!queue.empty())
 	{
-		ROS_INFO("Processing grasping data");
+		ROS_INFO("===== Processing grasping data =====");
 
-		/********** STAGE 1: add collisions to the planning scene **********/
+
+		/*********************************************************/
+		/********** STAGE 1: generate collision objects **********/
+		/*********************************************************/
 		ROS_INFO("...generating collision object");
 		geometry_msgs::PointStamped minPt = queue.front().boundingBoxMin;
 		geometry_msgs::PointStamped maxPt = queue.front().boundingBoxMax;
@@ -146,16 +200,22 @@ void timerCallback(const ros::TimerEvent &event_,
 		collisions.push_back(targetCollision);
 
 
-		/********** STAGE 2: generate grasp **********/
+		/*********************************************************/
+		/********** STAGE 2: test every grasping points **********/
+		/*********************************************************/
 		size_t npoints = queue.front().graspingPoints.size();
 		for (size_t i = 0; i < npoints; i++)
 		{
 			ROS_INFO("*** processing point %zu of %zu ***", i + 1, npoints);
 
+
+			/********** STAGE 2.1: add collisions to the scene **********/
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
 			ros::Duration(2.0).sleep();
 
+
+			/********** STAGE 2.2: generate grasping pose **********/
 			ROS_DEBUG("Generating grasping point");
 			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
 			geometry_msgs::PoseStamped graspingPose = genGraspingPose(point);
@@ -163,56 +223,65 @@ void timerCallback(const ros::TimerEvent &event_,
 			if (debugEnabled_)
 			{
 				ROS_DEBUG("Publishing grasping point");
-				geometry_msgs::PointStamped pointMsg;
-				pointMsg.header = point.header;
-				pointMsg.point = point.position;
+				// geometry_msgs::PointStamped pointMsg;
+				// pointMsg.header = point.header;
+				// pointMsg.point = point.position;
+				geometry_msgs::PoseStamped pointMsg = graspingPose;
+				pointMsg.pose.position = point.position;
+				// pointMsg.header = point.header;
+				// pointMsg.pose.position = point.position;
+				// pointMsg.pose.orientation.x = 0;
+				// pointMsg.pose.orientation.y = 0;
+				// pointMsg.pose.orientation.z = 0;
+				// pointMsg.pose.orientation.w = 1;
 				graspingPointPublisher.publish(pointMsg);
 			}
-
 
 			ROS_DEBUG("Publishing grasping pose");
 			posePublisher.publish(graspingPose);
 
 
+			/********** STAGE 2.3: synthesize grasp **********/
 			ROS_INFO("...synthesizing grasp");
-			moveit_msgs::Grasp grasp;
-			grasp.id = GRASP_ID;
-			grasp.grasp_pose = graspingPose;
+			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, TARGET_OBJECT);
+			// moveit_msgs::Grasp grasp;
+			// grasp.id = GRASP_ID;
+			// grasp.grasp_pose = graspingPose;
 
-			grasp.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
-			grasp.pre_grasp_approach.direction.vector.x = 1;
-			grasp.pre_grasp_approach.direction.vector.y = 0;
-			grasp.pre_grasp_approach.direction.vector.z = 0;
-			grasp.pre_grasp_approach.min_distance = 0.05;
-			grasp.pre_grasp_approach.desired_distance = 0.18;
-
-
-			grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
-			grasp.pre_grasp_posture.points.resize(1);
-			grasp.pre_grasp_posture.points[0].positions.resize(1);
-			grasp.pre_grasp_posture.points[0].positions[0] = 1;
-			grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+			// grasp.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
+			// grasp.pre_grasp_approach.direction.vector.x = 1;
+			// grasp.pre_grasp_approach.direction.vector.y = 0;
+			// grasp.pre_grasp_approach.direction.vector.z = 0;
+			// grasp.pre_grasp_approach.min_distance = 0.05;
+			// grasp.pre_grasp_approach.desired_distance = 0.18;
 
 
-			grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
-			grasp.grasp_posture.points.resize(1);
-			grasp.grasp_posture.points[0].positions.resize(1);
-			grasp.grasp_posture.points[0].positions[0] = 0;
-			grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
+			// grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+			// grasp.pre_grasp_posture.points.resize(1);
+			// grasp.pre_grasp_posture.points[0].positions.resize(1);
+			// grasp.pre_grasp_posture.points[0].positions[0] = 1;
+			// grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
-			grasp.post_grasp_retreat.direction.header.frame_id = FRAME_BASE;
-			grasp.post_grasp_retreat.direction.vector.x = 0;
-			grasp.post_grasp_retreat.direction.vector.y = 0;
-			grasp.post_grasp_retreat.direction.vector.z = 1;
-			grasp.post_grasp_retreat.min_distance = 0.08;
-			grasp.post_grasp_retreat.desired_distance = 0.3;
-
-			grasp.allowed_touch_objects.clear();
-			grasp.allowed_touch_objects.push_back(TARGET_OBJECT);
+			// grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+			// grasp.grasp_posture.points.resize(1);
+			// grasp.grasp_posture.points[0].positions.resize(1);
+			// grasp.grasp_posture.points[0].positions[0] = 0;
+			// grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
+			// grasp.post_grasp_retreat.direction.header.frame_id = FRAME_BASE;
+			// grasp.post_grasp_retreat.direction.vector.x = 0;
+			// grasp.post_grasp_retreat.direction.vector.y = 0;
+			// grasp.post_grasp_retreat.direction.vector.z = 1;
+			// grasp.post_grasp_retreat.min_distance = 0.08;
+			// grasp.post_grasp_retreat.desired_distance = 0.3;
 
+			// grasp.allowed_touch_objects.clear();
+			// grasp.allowed_touch_objects.push_back(TARGET_OBJECT);
+
+
+			/********** STAGE 2.4: attempt grasp **********/
 			ROS_INFO("...attempting grasp");
 			std::vector<moveit_msgs::Grasp> grasps;
 			grasps.push_back(grasp);
@@ -221,30 +290,54 @@ void timerCallback(const ros::TimerEvent &event_,
 			ROS_INFO("...grasp finished (error code: %d)", errCode.val);
 
 
-			// Move the object
+			/********** STAGE 2.5: put the effector in front of the kinect **********/
 			ROS_INFO("...moving object");
-			effector_->setPoseTarget(GraspingUtils::genPose(0.15, -0.5, 0.3, DEG2RAD(90), 0, 1, 0));
+			// effector_->setPoseTarget(GraspingUtils::genPose(0.15, -0.5, 0.3, DEG2RAD(90), 0, 1, 0));
+			effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
+			effector_->setPoseReferenceFrame(FRAME_BASE);
 			effector_->move();
 			ros::Duration(1).sleep();
 
 
+			/********** STAGE 2.6: remove collision objects **********/
 			ROS_INFO("...detaching collision objects");
 			effector_->detachObject(TARGET_OBJECT);
-			ros::Duration(1.0).sleep();
-
+			ros::Duration(2.0).sleep();
 
 			ROS_INFO("...removing collision objects");
 			std::vector<std::string> ids;
 			ids.push_back(TARGET_OBJECT);
 			planningScene_->removeCollisionObjects(ids);
-			ros::Duration(1.0).sleep();
+			ros::Duration(2.0).sleep();
 
-			ROS_INFO("*** point processing finished ***");
+
+			/********** STAGE 2.7: check the grasping attempt result **********/
+			bool result = checkGraspResult();
+			ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
+
+
+			/********** STAGE 2.8: restore the testing setup **********/
+			ROS_INFO("...restoring setup");
+			pr2_grasping::GazeboSetup srv;
+			srv.request.resetObject = true;
+			if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
+				ROS_INFO("...setup %s", srv.response.result ? "RESTORED" : "restore FAILED");
+			ros::Duration(2.0).sleep();
+
+
+			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
 		}
 
 		// Remove the processed grasping data
 		ROS_DEBUG("Removing processed grasping data");
 		queue.pop_front();
+	}
+
+	if (queue.empty())
+	{
+		pr2_grasping::GazeboLabeler srv;
+		if (ros::service::call("/pr2_grasping/gazebo_labeler", srv))
+			ROS_INFO("...labeling %s", srv.response.result ? "SCHEDULED" : "NOT SCHEDULED");
 	}
 }
 
@@ -270,19 +363,15 @@ int main(int _argn, char **_argv)
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
 
-
+	// Call the setup service to prepare the robot and environment
 	ROS_INFO("Calling setup service");
-	ros::ServiceClient setupService = handler.serviceClient<pr2_grasping::GazeboSetup>("/pr2_grasping/gazebo_setup");
 	pr2_grasping::GazeboSetup srv;
-	if (setupService.call(srv))
-		ROS_INFO("Setup succeeded: %s", srv.response.result ? "TRUE" : "FALSE");
-	ROS_INFO("After setup service call");
+	srv.request.resetObject = true;
+	if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
+		ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED");
 
 
-
-
-	// For some reason this MUST be declared before using the group planning capabilities, otherwise
-	// collision objects won't be added to the planning interface (WTF)
+	// This MUST be declared before planning, otherwise collisions won't work (WTF)
 	moveit::planning_interface::PlanningSceneInterface planningScene;
 
 
@@ -300,13 +389,15 @@ int main(int _argn, char **_argv)
 	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
+	// Set debug stuff
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
 		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
-		graspingPointPublisher = handler.advertise<geometry_msgs::PointStamped>("/pr2_grasping/debug_grasping_point", 1, true);
+		// graspingPointPublisher = handler.advertise<geometry_msgs::PointStamped>("/pr2_grasping/debug_grasping_point", 1, true);
+		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
 	}
 
 
