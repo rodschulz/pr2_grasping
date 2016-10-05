@@ -68,6 +68,7 @@ add_message_files(
 # Add custom service files
 add_service_files(
 	FILES
+		GazeboLabeler.srv
 		GazeboSetup.srv
 )
 

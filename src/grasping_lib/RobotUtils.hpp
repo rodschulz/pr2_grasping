@@ -17,7 +17,7 @@ enum Effector
 
 
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
-#define FRAME_BASE			"base_link"
+#define FRAME_BASE			"base_footprint"
 
 
 // Class implementing utilities for robot interaction

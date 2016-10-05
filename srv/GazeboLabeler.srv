@@ -1,0 +1,3 @@
+---
+# Indicates if the labeling was successfully scheduled
+bool result
