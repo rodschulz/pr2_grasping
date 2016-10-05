@@ -12,7 +12,7 @@
 		<!-- A table to hold things -->
 		<include>
 			<uri>model://low_table</uri>
-			<name>table</name>
+			<name>low_table</name>
 			<pose>1.4 0 0 0 0 0</pose>
 		</include>
 		<!-- A table to hold things -->
