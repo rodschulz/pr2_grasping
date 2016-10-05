@@ -5,6 +5,7 @@ models:
       cordless_drill: '~/.gazebo/models/cordless_drill/model-1_4.sdf',
       hammer: '~/.gazebo/models/hammer/model-1_4.sdf',
       monkey_wrench: '~/.gazebo/models/monkey_wrench/model-1_4.sdf',
+      low_table: ~/.gazebo/models/low_table/model-1_4.sdf,
       thin_beer: '~/.gazebo/models/thin_beer/model-1_4.sdf',
       tube_9_5mm: '~/.gazebo/models/tube_9_5mm/model-1_4.sdf',
       wood_cube_5cm: '~/.gazebo/models/wood_cube_5cm/model-1_4.sdf',
