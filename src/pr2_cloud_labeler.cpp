@@ -317,15 +317,19 @@ int main(int argn_, char **argv_)
 	spinner.start();
 
 
-	// Set the publishers
+	// Set publishers
 	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
 	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
 
+	// Set subscriptions
+	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
+	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
 
-	// Service for setup configuration
+	// Set services
 	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
 
 
+	// Set debug behavior
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
@@ -334,11 +338,6 @@ int main(int argn_, char **argv_)
 		limitsPublisher = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/debug_limits", 1);
 		planePublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_clipping_plane", 1);
 	}
-
-
-	// Set the subscription to get the point clouds
-	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
-	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
 
 
 	// Keep looping
