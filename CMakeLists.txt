@@ -141,10 +141,10 @@ include_directories(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ executables
 ### App nodes ###
-add_executable(pr2_cloud_labeler src/pr2_cloud_labeler.cpp)
 add_executable(gazebo_pr2_setup src/gazebo_pr2_setup.cpp)
+add_executable(pr2_cloud_labeler src/pr2_cloud_labeler.cpp)
+add_executable(pr2_grasp_evaluator src/pr2_grasp_evaluator.cpp)
 add_executable(pr2_grasper src/pr2_grasper.cpp)
-add_executable(pr2_result_evaluator src/pr2_result_evaluator.cpp)
 ### Example nodes ###
 add_executable(example_gp src/example_gp.cpp)
 add_executable(example_ac src/example_ac.cpp)
@@ -168,8 +168,8 @@ set(APPS_LINKING_DEPENDENCIES
 ### App nodes ###
 target_link_libraries(gazebo_pr2_setup ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_cloud_labeler ${APPS_LINKING_DEPENDENCIES})
+target_link_libraries(pr2_grasp_evaluator ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasper ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(pr2_result_evaluator ${APPS_LINKING_DEPENDENCIES})
 ### Example nodes ###
 target_link_libraries(example_gp ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(example_ac ${APPS_LINKING_DEPENDENCIES})
