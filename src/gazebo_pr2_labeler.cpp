@@ -287,7 +287,7 @@ bool scheduleLabeling(pr2_grasping::GazeboLabeler::Request  &request_,
 /**************************************************/
 int main(int argn_, char **argv_)
 {
-	ros::init(argn_, argv_, "gazebo_pr2_labeler");
+	ros::init(argn_, argv_, "pr2_cloud_labeler");
 	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
