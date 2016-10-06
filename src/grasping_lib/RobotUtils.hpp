@@ -57,6 +57,22 @@ public:
 		}
 	}
 
+	/**************************************************/
+	static inline std::string getGripperTopic(const std::string &arm_)
+	{
+		if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
+			return "r_gripper_controller/gripper_action";
+
+		else if (boost::iequals(arm_, "left") || boost::iequals(arm_, "left_arm"))
+			return "l_gripper_controller/gripper_action";
+
+		else
+		{
+			ROS_WARN("Wrong effector type, assuming right arm");
+			return "";
+		}
+	}
+
 private:
 	// Constructor
 	RobotUtils();
