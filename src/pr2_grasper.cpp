@@ -7,7 +7,7 @@
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/GazeboSetup.h>
-#include <pr2_grasping/GazeboLabeler.h>
+#include <pr2_grasping/CloudLabeler.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <control_msgs/GripperCommandAction.h>
@@ -344,10 +344,11 @@ void timerCallback(const ros::TimerEvent &event_,
 		queue.pop_front();
 	}
 
+	// Call the labeling service if no points are queued
 	if (queue.empty())
 	{
-		pr2_grasping::GazeboLabeler srv;
-		if (ros::service::call("/pr2_grasping/gazebo_labeler", srv))
+		pr2_grasping::CloudLabeler srv;
+		if (ros::service::call("/pr2_grasping/cloud_labeler", srv))
 			ROS_INFO("...labeling %s", srv.response.result ? "SCHEDULED" : "NOT SCHEDULED");
 	}
 }

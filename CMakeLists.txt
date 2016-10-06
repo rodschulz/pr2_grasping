@@ -68,8 +68,9 @@ add_message_files(
 # Add custom service files
 add_service_files(
 	FILES
-		GazeboLabeler.srv
+		CloudLabeler.srv
 		GazeboSetup.srv
+		GraspEvaluator.srv
 )
 
 # Generate the custom messages

@@ -7,7 +7,7 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <pr2_grasping/ObjectCloudData.h>
-#include <pr2_grasping/GazeboLabeler.h>
+#include <pr2_grasping/CloudLabeler.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/impl/transforms.hpp>
@@ -272,8 +272,8 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 
 /**************************************************/
-bool scheduleLabeling(pr2_grasping::GazeboLabeler::Request  &request_,
-					  pr2_grasping::GazeboLabeler::Response &response_)
+bool scheduleLabeling(pr2_grasping::CloudLabeler::Request  &request_,
+					  pr2_grasping::CloudLabeler::Response &response_)
 {
 	mutex.lock();
 	labelingScheduled = true;
@@ -323,7 +323,7 @@ int main(int argn_, char **argv_)
 
 
 	// Service for setup configuration
-	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/gazebo_labeler", scheduleLabeling);
+	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
 
 
 	if (debugEnabled)

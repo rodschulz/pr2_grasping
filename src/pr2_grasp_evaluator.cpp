@@ -4,7 +4,7 @@
  */
 #include <stdlib.h>
 #include <ros/ros.h>
-#include <pr2_grasping/GazeboSetup.h>
+#include <pr2_grasping/GraspEvaluator.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include "Config.hpp"
@@ -12,8 +12,8 @@
 
 
 /**************************************************/
-bool evaluateGraspingResult(pr2_grasping::GazeboSetup::Request  &request_,
-			  pr2_grasping::GazeboSetup::Response &response_)
+bool evaluateGraspingResult(pr2_grasping::GraspEvaluator::Request  &request_,
+							pr2_grasping::GraspEvaluator::Response &response_)
 {
 	return true;
 }
@@ -32,7 +32,7 @@ int main(int argn_, char** argv_)
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
 	// Service for result evaluation
-	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/result_evaluator", evaluateGraspingResult);
+	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/grasp_evaluator", evaluateGraspingResult);
 
 	// Start the service
 	ROS_INFO("Starting grasping evaluation service");
