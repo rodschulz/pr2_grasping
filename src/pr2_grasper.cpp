@@ -165,37 +165,38 @@ bool checkGraspResult()
 /**************************************************/
 bool releaseObject(MoveGroupPtr &effector_)
 {
-	GripperClient *gripperClient = new GripperClient(RobotUtils::getGripperTopic(effector_.getName()), true);
-	while (!gripperClient->waitForServer(ros::Duration(5.0)))
+	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
+	while (!client->waitForServer(ros::Duration(5.0)))
 		ROS_INFO("Waiting for gripper action server");
-	
+
 	control_msgs::GripperCommandGoal cmd;
 	cmd.command.position = 1.0;
 
-	client_->cancelAllGoals();
-	client_->sendGoalAndWait(cmd);
-	ROS_INFO("...object released (%s)", client_->getState().toString().c_str());
-	
+	client->cancelAllGoals();
+	client->sendGoalAndWait(cmd);
+	ROS_INFO("...object released (%s)", client->getState().toString().c_str());
+
 	// ROS_INFO("Waiting to complete the action");
 
 	// Send the goal until is reached (apparently this isn't necessary in the real robot)
 	// int count = 0;
 	// while (true)
 	// {
-		// count++;
+	// count++;
 
-		// if (count % 5 == 0)
-			// ROS_INFO("...state %s", client_->getState().toString().c_str());
+	// if (count % 5 == 0)
+	// ROS_INFO("...state %s", client_->getState().toString().c_str());
 
-		// if (client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-		// {
-			// ROS_INFO("Gripper action completed");
-			// break;
-		// }
-		// client_->cancelAllGoals();
-		// client_->sendGoal(cmd);
-		// ros::Duration(0.2).sleep();
-	}
+	// if (client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+	// {
+	// ROS_INFO("Gripper action completed");
+	// break;
+	// }
+	// client_->cancelAllGoals();
+	// client_->sendGoal(cmd);
+	// ros::Duration(0.2).sleep();
+
+	return true;
 }
 
 
@@ -322,7 +323,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			/********** STAGE 2.8: release the object **********/
-			/** This MUST be done before restoring the setup, otherwise the 
+			/** This MUST be done before restoring the setup, otherwise the
 			robot gets moved when the object's position is reseted **/
 			ROS_INFO("...releasing object");
 			releaseObject(effector_);

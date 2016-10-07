@@ -25,6 +25,12 @@ tf::TransformListener *tfListener;
 
 
 /**************************************************/
+void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
+{
+}
+
+
+/**************************************************/
 bool evaluateGraspingResult(pr2_grasping::GraspEvaluator::Request  &request_,
 							pr2_grasping::GraspEvaluator::Response &response_)
 {
@@ -48,7 +54,7 @@ int main(int argn_, char** argv_)
 
 	// Set subscription
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
-	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
+	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, cloudCallback);
 
 	// Set service
 	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/grasp_evaluator", evaluateGraspingResult);
