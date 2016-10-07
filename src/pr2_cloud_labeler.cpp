@@ -53,6 +53,8 @@ ros::Publisher cloudPublisher, dataPublisher;
 CvSVMPtr svm;
 boost::mutex mutex;
 bool labelingScheduled = false;
+int labelingTries = 0;
+int labelingMaxAttempts = 5;
 
 /***** Debug variables *****/
 ros::Publisher limitsPublisher, planePublisher;
@@ -150,7 +152,18 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
-		ROS_INFO("Cloud received");
+		// Stop if too many try have been done
+		if (labelingTries++ >= labelingMaxAttempts)
+		{
+			ROS_WARN("Too many labeling attempts failed, stopping...");
+			labelingTries = 0;
+			mutex.lock();
+			labelingScheduled = false;
+			mutex.unlock();
+			return;
+		}
+		else
+			ROS_INFO("Cloud received");
 
 
 		/***** STAGE 1: retrieve data *****/
