@@ -60,6 +60,7 @@ def analyze(data_):
 	rp.loginfo('Retrieved %d pts', npts)
 
 	# Compute DBSCAN
+	rp.loginfo('...synthesizing grasping points')
 	graspPts = []
 	minDataSize = 0.1 * npts
 	for key in points:
@@ -88,10 +89,9 @@ def analyze(data_):
 			if debug:
 				utils.plotData3D(positionData, db.labels_, key, nclusters)
 
-	rp.loginfo('...finished')
-
 
 	# Publish the synthesized grasping points
+	rp.loginfo('...publishing %d grasping points', len(graspPts))
 	msg = GraspingData()
 	msg.graspingPoints = graspPts
 	msg.boundingBoxMin = data_.boundingBoxMin
@@ -117,6 +117,7 @@ if __name__ == '__main__':
 		rp.Subscriber('/pr2_grasping/object_cloud_data', ObjectCloudData, analyze)
 
 		# Spin until the node is stopped
+		rp.loginfo("Analyzer node spinning")
 		rp.spin()
 	
 	except IOError as e:
