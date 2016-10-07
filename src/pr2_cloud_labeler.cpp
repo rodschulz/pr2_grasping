@@ -152,19 +152,22 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
+		mutex.lock();
+		++labelingTries;
+		mutex.unlock();
+
 		// Stop if too many try have been done
 		if (labelingTries++ >= labelingMaxAttempts)
 		{
 			ROS_WARN("Too many labeling attempts failed, stopping...");
-			labelingTries = 0;
 			mutex.lock();
+			labelingTries = 0;
 			labelingScheduled = false;
 			mutex.unlock();
 			return;
 		}
 		else
 			ROS_INFO("Cloud received");
-
 
 		/***** STAGE 1: retrieve data *****/
 
@@ -279,6 +282,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 		mutex.lock();
 		labelingScheduled = false;
+		labelingTries = 0;
 		mutex.unlock();
 	}
 }

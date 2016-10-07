@@ -77,10 +77,6 @@ def analyze(data_):
 
 
 		if nclusters > 0:
-			# Calculate the silhouette coeff only if there's more than 1 cluster
-			# if nclusters > 1:
-			# 	rp.loginfo('.....silhouette: %0.3f', metrics.silhouette_score(positionData, db.labels_))
-
 			# Synthesize the grasping points
 			normalsData = np.array(normals[key])
 			graspPts = graspPts + synthesizePoints(data_.cloud.header.frame_id, positionData, normalsData, db.labels_, key)
@@ -92,6 +88,11 @@ def analyze(data_):
 
 	# Publish the synthesized grasping points
 	rp.loginfo('...publishing %d grasping points', len(graspPts))
+
+	if debug:
+		for gp in graspPts:
+			rp.loginfo('.....p=(%.3f, %.3f, %.3f) - n=(%.3f, %.3f, %.3f) - l=%d', gp.position.x, gp.position.y, gp.position.z, gp.normal.x, gp.normal.y, gp.normal.z, gp.label)
+
 	msg = GraspingData()
 	msg.graspingPoints = graspPts
 	msg.boundingBoxMin = data_.boundingBoxMin
