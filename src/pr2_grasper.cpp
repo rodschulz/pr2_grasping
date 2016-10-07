@@ -106,14 +106,46 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 	geometry_msgs::PoseStamped pose;
 	pose.header = point_.header;
-	pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(0), n.x(), n.y(), n.z());
+	// pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(0), n.x(), n.y(), n.z());
+	pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(180), 1, 0, 0);
+
+
+	Eigen::Quaternionf xx = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), n);
+	pose.pose.orientation.w = xx.w();
+	pose.pose.orientation.x = xx.x();
+	pose.pose.orientation.y = xx.y();
+	pose.pose.orientation.z = xx.z();
+
+	// pose.pose.position.x = g.x();
+	// pose.pose.position.y = g.y();
+	// pose.pose.position.z = g.z();
+	// pose.pose.orientation.x = n.x();
+	// pose.pose.orientation.y = n.y();
+	// pose.pose.orientation.z = n.z();
+	// pose.pose.orientation.w = 0;
+	//////
+	// n = Eigen::Vector3f(1, 1, 0).normalized();
+	// pose.pose.orientation.x = n.x();
+	// pose.pose.orientation.y = n.y();
+	// pose.pose.orientation.z = n.z();
+	// pose.pose.orientation.w = 0;
+	//////
+	// pose.pose.orientation.x = 0;
+	// pose.pose.orientation.y = 1;
+	// pose.pose.orientation.z = 0;
+	// pose.pose.orientation.w = 0;
+
+	ROS_DEBUG_STREAM("Synthesized grasping pose\n" << pose);
 
 	return pose;
 }
 
 
 /**************************************************/
-moveit_msgs::Grasp genGrasp(const std::string &graspId_, const std::string &referenceFrame_, const geometry_msgs::PoseStamped &graspingPose_, const std::string &targetObject_)
+moveit_msgs::Grasp genGrasp(const std::string &graspId_,
+							const std::string &referenceFrame_,
+							const geometry_msgs::PoseStamped &graspingPose_,
+							const std::string &targetObject_)
 {
 	moveit_msgs::Grasp grasp;
 	grasp.id = graspId_;
@@ -163,40 +195,46 @@ bool checkGraspResult()
 
 
 /**************************************************/
-bool releaseObject(MoveGroupPtr &effector_)
+void releaseObject(MoveGroupPtr &effector_)
 {
+	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
+		ros::console::notifyLoggerLevelsChanged();
+
 	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
 	while (!client->waitForServer(ros::Duration(5.0)))
-		ROS_INFO("Waiting for gripper action server");
+		ROS_INFO("Waiting gripper action server to come online");
 
 	control_msgs::GripperCommandGoal cmd;
-	cmd.command.position = 1.0;
+	cmd.command.position =  0.09; // Gripper open 0.07
+	cmd.command.max_effort = -1.0; // No limit for the max effort
 
 	client->cancelAllGoals();
-	client->sendGoalAndWait(cmd);
-	ROS_INFO("...object released (%s)", client->getState().toString().c_str());
+	ros::Duration(1.0).sleep();
+	client->sendGoal(cmd);
 
-	// ROS_INFO("Waiting to complete the action");
+	ROS_INFO("Waiting to complete the gripper action");
 
 	// Send the goal until is reached (apparently this isn't necessary in the real robot)
-	// int count = 0;
-	// while (true)
-	// {
-	// count++;
+	int count = 0;
+	while (true)
+	{
+		count++;
+		if (count % 5 == 0)
+			ROS_INFO("...state %s", client->getState().toString().c_str());
 
-	// if (count % 5 == 0)
-	// ROS_INFO("...state %s", client_->getState().toString().c_str());
+		if (client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+			break;
 
-	// if (client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-	// {
-	// ROS_INFO("Gripper action completed");
-	// break;
-	// }
-	// client_->cancelAllGoals();
-	// client_->sendGoal(cmd);
-	// ros::Duration(0.2).sleep();
+		client->sendGoal(cmd);
+		ros::Duration(0.2).sleep();
+	}
+	ROS_INFO("Gripper action completed");
 
-	return true;
+
+	ROS_INFO("Finishing all goals");
+	client->cancelAllGoals();
+	client->stopTrackingGoal();
+	ros::Duration(1.0).sleep();
 }
 
 
@@ -265,22 +303,24 @@ void timerCallback(const ros::TimerEvent &event_,
 			if (debugEnabled_)
 			{
 				ROS_DEBUG("Publishing grasping point");
-				// geometry_msgs::PointStamped pointMsg;
-				// pointMsg.header = point.header;
-				// pointMsg.point = point.position;
 				geometry_msgs::PoseStamped pointMsg = graspingPose;
 				pointMsg.pose.position = point.position;
-				// pointMsg.header = point.header;
-				// pointMsg.pose.position = point.position;
-				// pointMsg.pose.orientation.x = 0;
-				// pointMsg.pose.orientation.y = 0;
-				// pointMsg.pose.orientation.z = 0;
-				// pointMsg.pose.orientation.w = 1;
 				graspingPointPublisher.publish(pointMsg);
 			}
 
 			ROS_DEBUG("Publishing grasping pose");
 			posePublisher.publish(graspingPose);
+
+
+
+
+			//============
+			ros::Duration(5.0).sleep();
+			continue;
+			//============
+
+
+
 
 
 			/********** STAGE 2.3: synthesize grasp **********/
@@ -293,8 +333,8 @@ void timerCallback(const ros::TimerEvent &event_,
 			std::vector<moveit_msgs::Grasp> grasps;
 			grasps.push_back(grasp);
 			moveit::planning_interface::MoveItErrorCode errCode = effector_->pick(TARGET_OBJECT, grasps);
-			ros::Duration(1).sleep();
 			ROS_INFO("...grasp finished (error code: %d)", errCode.val);
+			ros::Duration(0.5).sleep();
 
 
 			/********** STAGE 2.5: put the effector in front of the kinect **********/
@@ -302,6 +342,16 @@ void timerCallback(const ros::TimerEvent &event_,
 			effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
 			effector_->setPoseReferenceFrame(FRAME_BASE);
 			effector_->move();
+			ros::Duration(1).sleep();
+
+
+			ROS_INFO("...releasing object");
+			releaseObject(effector_);
+			ros::Duration(1).sleep();
+
+
+			ROS_INFO("...detaching 1");
+			effector_->detachObject();
 			ros::Duration(1).sleep();
 
 
@@ -318,15 +368,15 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			/********** STAGE 2.7: check the grasping attempt result **********/
-			bool result = checkGraspResult();
-			ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
+			// bool result = checkGraspResult();
+			// ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
 
 
 			/********** STAGE 2.8: release the object **********/
 			/** This MUST be done before restoring the setup, otherwise the
 			robot gets moved when the object's position is reseted **/
-			ROS_INFO("...releasing object");
-			releaseObject(effector_);
+			// ROS_INFO("...releasing object");
+			// releaseObject(effector_);
 
 			/********** STAGE 2.9: restore the testing setup **********/
 			ROS_INFO("...restoring setup");
@@ -382,6 +432,7 @@ int main(int _argn, char **_argv)
 	srv.request.resetObject = true;
 	if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
 		ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED");
+	ros::Duration(0.5).sleep();
 
 
 	// This MUST be declared before planning, otherwise collisions won't work (WTF)
@@ -409,7 +460,6 @@ int main(int _argn, char **_argv)
 			ros::console::notifyLoggerLevelsChanged();
 
 		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
-		// graspingPointPublisher = handler.advertise<geometry_msgs::PointStamped>("/pr2_grasping/debug_grasping_point", 1, true);
 		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
 	}
 
