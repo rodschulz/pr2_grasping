@@ -26,9 +26,11 @@
 #define TARGET_OBJECT		"target_object"
 #define GRASP_ID			"target_grasp"
 
+
 // Pointer to a move group interface
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperClient;
+
 
 /***** Global variables *****/
 ros::Publisher posePublisher;
@@ -104,40 +106,20 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 	// Generate a point moving along the line and going outside the object
 	Eigen::Vector3f g = line.pointAt(graspPadding);
 
-	geometry_msgs::PoseStamped pose;
-	pose.header = point_.header;
-	// pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(0), n.x(), n.y(), n.z());
-	pose.pose = GraspingUtils::genPose(g.x(), g.y(), g.z(), DEG2RAD(180), 1, 0, 0);
+	geometry_msgs::PoseStamped graspingPose;
+	graspingPose.header = point_.header;
+	graspingPose.pose.position.x = g.x();
+	graspingPose.pose.position.y = g.y();
+	graspingPose.pose.position.z = g.z();
 
+	// Set the orientation according to the grasping point's normal
+	Eigen::Quaternionf orientation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), n);
+	graspingPose.pose.orientation.w = orientation.w();
+	graspingPose.pose.orientation.x = orientation.x();
+	graspingPose.pose.orientation.y = orientation.y();
+	graspingPose.pose.orientation.z = orientation.z();
 
-	Eigen::Quaternionf xx = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), n);
-	pose.pose.orientation.w = xx.w();
-	pose.pose.orientation.x = xx.x();
-	pose.pose.orientation.y = xx.y();
-	pose.pose.orientation.z = xx.z();
-
-	// pose.pose.position.x = g.x();
-	// pose.pose.position.y = g.y();
-	// pose.pose.position.z = g.z();
-	// pose.pose.orientation.x = n.x();
-	// pose.pose.orientation.y = n.y();
-	// pose.pose.orientation.z = n.z();
-	// pose.pose.orientation.w = 0;
-	//////
-	// n = Eigen::Vector3f(1, 1, 0).normalized();
-	// pose.pose.orientation.x = n.x();
-	// pose.pose.orientation.y = n.y();
-	// pose.pose.orientation.z = n.z();
-	// pose.pose.orientation.w = 0;
-	//////
-	// pose.pose.orientation.x = 0;
-	// pose.pose.orientation.y = 1;
-	// pose.pose.orientation.z = 0;
-	// pose.pose.orientation.w = 0;
-
-	ROS_DEBUG_STREAM("Synthesized grasping pose\n" << pose);
-
-	return pose;
+	return graspingPose;
 }
 
 
