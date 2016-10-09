@@ -292,9 +292,12 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 bool scheduleLabeling(pr2_grasping::CloudLabeler::Request  &request_,
 					  pr2_grasping::CloudLabeler::Response &response_)
 {
-	mutex.lock();
-	labelingScheduled = true;
-	mutex.unlock();
+	if (!labelingScheduled)
+	{
+		mutex.lock();
+		labelingScheduled = true;
+		mutex.unlock();
+	}
 
 	response_.result = true;
 	return true;

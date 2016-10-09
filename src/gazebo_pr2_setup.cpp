@@ -93,6 +93,10 @@ bool moveArms()
 	armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
 	armsGroup.setPoseTarget(leftArmPose, "l_wrist_roll_link");
 
+	// Stop any previous movement
+	armsGroup.stop();
+	ros::Duration(1.0).sleep();
+
 	// plan the trajectory
 	moveit::planning_interface::MoveGroup::Plan armsPlan;
 	ROS_INFO("...planing arms trajectory");
