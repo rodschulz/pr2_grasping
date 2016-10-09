@@ -113,7 +113,7 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 	graspingPose.pose.position.z = g.z();
 
 	// Set the orientation according to the grasping point's normal
-	Eigen::Quaternionf orientation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), n);
+	Eigen::Quaternionf orientation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), -n);
 	graspingPose.pose.orientation.w = orientation.w();
 	graspingPose.pose.orientation.x = orientation.x();
 	graspingPose.pose.orientation.y = orientation.y();
@@ -294,17 +294,6 @@ void timerCallback(const ros::TimerEvent &event_,
 			posePublisher.publish(graspingPose);
 
 
-
-
-			//============
-			ros::Duration(5.0).sleep();
-			continue;
-			//============
-
-
-
-
-
 			/********** STAGE 2.3: synthesize grasp **********/
 			ROS_INFO("...synthesizing grasp");
 			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, TARGET_OBJECT);
@@ -320,45 +309,50 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			/********** STAGE 2.5: put the effector in front of the kinect **********/
-			ROS_INFO("...moving object");
 			effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
 			effector_->setPoseReferenceFrame(FRAME_BASE);
+
+			ROS_INFO("...trying to move the object");
+			moveit::planning_interface::MoveGroup::Plan plan;
+			while (!effector_->plan(plan))
+			{
+				ROS_INFO(".....planning failed, retrying");
+				ros::Duration(0.5).sleep();
+				effector_->setPoseTarget(effector_->getRandomPose());
+				effector_->move();
+
+				ros::Duration(0.5).sleep();
+				effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
+				effector_->setPoseReferenceFrame(FRAME_BASE);
+			}
 			effector_->move();
 			ros::Duration(1).sleep();
 
 
+			/********** STAGE 2.6: check the grasping attempt result **********/
+			bool result = checkGraspResult();
+			ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
+
+
+			/********** STAGE 2.7: release the object **********/
+			/** This MUST be done before restoring the setup, otherwise the
+			robot gets moved when the object's position is reseted **/
 			ROS_INFO("...releasing object");
 			releaseObject(effector_);
 			ros::Duration(1).sleep();
 
 
-			ROS_INFO("...detaching 1");
-			effector_->detachObject();
-			ros::Duration(1).sleep();
-
-
-			/********** STAGE 2.6: remove collision objects **********/
+			/********** STAGE 2.8: remove collision objects **********/
 			ROS_INFO("...detaching collision objects");
 			effector_->detachObject(TARGET_OBJECT);
-			ros::Duration(2.0).sleep();
+			ros::Duration(1).sleep();
 
 			ROS_INFO("...removing collision objects");
 			std::vector<std::string> ids;
 			ids.push_back(TARGET_OBJECT);
 			planningScene_->removeCollisionObjects(ids);
-			ros::Duration(2.0).sleep();
+			ros::Duration(1).sleep();
 
-
-			/********** STAGE 2.7: check the grasping attempt result **********/
-			// bool result = checkGraspResult();
-			// ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
-
-
-			/********** STAGE 2.8: release the object **********/
-			/** This MUST be done before restoring the setup, otherwise the
-			robot gets moved when the object's position is reseted **/
-			// ROS_INFO("...releasing object");
-			// releaseObject(effector_);
 
 			/********** STAGE 2.9: restore the testing setup **********/
 			ROS_INFO("...restoring setup");
@@ -366,7 +360,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			srv.request.resetObject = true;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
 				ROS_INFO("...setup %s", srv.response.result ? "RESTORED" : "restore FAILED");
-			ros::Duration(2.0).sleep();
+			ros::Duration(1).sleep();
 
 
 			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);

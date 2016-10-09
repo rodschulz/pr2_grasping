@@ -12,6 +12,9 @@
 #include <pr2_controllers_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <yaml-cpp/yaml.h>
+#include <yaml-cpp/node/parse.h>
+#include <yaml-cpp/node/impl.h>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
 #include "GazeboUtils.hpp"
@@ -26,8 +29,8 @@ typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> Hea
 bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
-std::map<std::string, bool> ignoreMap;
-std::map<std::string, geometry_msgs::Pose> initState;
+std::pair<std::string, geometry_msgs::Pose> state;
+YAML::Node models;
 
 
 /**************************************************/
@@ -173,16 +176,54 @@ void moveHead()
 
 
 /**************************************************/
+void retrieveWorldState()
+{
+	std::vector<std::string> list = Config::get()["setup"]["ignore"].as<std::vector<std::string> >();
+	std::map<std::string, bool> ignoreMap;
+	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
+		ignoreMap[*it] = true;
+
+	// Retrieve the world's initial state
+	std::map<std::string, geometry_msgs::Pose> initState;
+	if (!GazeboUtils::getWorldState(initState, ignoreMap))
+	{
+		std::string msg = "Unable to retrieve initial world state";
+		ROS_ERROR_STREAM(msg);
+		throw std::runtime_error(msg.c_str());
+	}
+	ROS_INFO("Retrieved state for: ");
+	for (std::map<std::string, geometry_msgs::Pose>::const_iterator it = initState.begin(); it != initState.end(); it++)
+	{
+		ROS_INFO_STREAM("..." << it->first);
+		state.first = it->first;
+		state.second = it->second;
+		break;
+	}
+}
+
+
+/**************************************************/
 bool resetObject()
 {
 	bool resetOk = true;
-	for (std::map<std::string, geometry_msgs::Pose>::const_iterator it = initState.begin(); it != initState.end(); it++)
+
+	size_t n = state.first.find_last_of(':');
+	std::string root = state.first.substr(0, n);
+	int spawns = n == std::string::npos ? 0 : boost::lexical_cast<int>(state.first.substr(n + 1));
+
+	ROS_INFO_STREAM("Deleting model " << state.first);
+	if (!GazeboUtils::deleteModel(state.first))
 	{
-		if (!GazeboUtils::setModelState(it->first, it->second, "world"))
-		{
-			ROS_WARN_STREAM("Can't reset state of model '" << it->first << "'");
-			resetOk = false;
-		}
+		ROS_WARN_STREAM("Can't delete model '" << state.first << "'");
+		resetOk = false;
+	}
+
+	state.first = root + ":" + boost::lexical_cast<std::string>(spawns + 1);
+	ROS_INFO_STREAM("Spawning model " << state.first);
+	if (!GazeboUtils::spawnModel(state.first, models["models"][root].as<std::string>(), state.second))
+	{
+		ROS_WARN_STREAM("Can't spawn model '" << state.first << "'");
+		resetOk = false;
 	}
 
 	return resetOk;
@@ -190,8 +231,8 @@ bool resetObject()
 
 
 /**************************************************/
-bool runSetup(pr2_grasping::GazeboSetup::Request  &request_,
-			  pr2_grasping::GazeboSetup::Response &response_)
+bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
+			  pr2_grasping::GazeboSetup::Response & response_)
 {
 	ROS_INFO("Beginning gazebo setup routine");
 
@@ -233,17 +274,8 @@ int main(int argn_, char** argv_)
 
 	// Load config data
 	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>(1.0);
-	std::vector<std::string> list = Config::get()["setup"]["ignore"].as<std::vector<std::string> >();
-	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
-		ignoreMap[*it] = true;
-
-	// Retrieve the world's initial state
-	if (!GazeboUtils::getWorldState(initState, ignoreMap))
-	{
-		std::string msg = "Unable to retrieve initial world state";
-		ROS_ERROR_STREAM(msg);
-		throw std::runtime_error(msg.c_str());
-	}
+	models = YAML::LoadFile(ros::package::getPath(PACKAGE_NAME) + "/config/" + Config::get()["setup"]["modelsFile"].as<std::string>());
+	retrieveWorldState();
 
 	// Publisher and subscriber for base's movement
 	cmdPublisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
@@ -251,6 +283,7 @@ int main(int argn_, char** argv_)
 
 	// Service for setup configuration
 	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
+
 
 	ROS_INFO("Starting setup service");
 	ros::AsyncSpinner spinner(2);
