@@ -12,10 +12,13 @@ from pr2_grasping.msg import GraspingPointArray
 from pr2_grasping.msg import ObjectCloudData
 
 
-# Debug flag 
-debug = False
-# Object for publishing the grasping points 
+##### Global variables #####
 publisher = None
+epsilon = 0.01
+minPoints = 10
+
+##### Debug variables flag #####
+debug = False
 
 
 ##################################################
@@ -71,7 +74,7 @@ def analyze(data_):
 		positionData = np.array(points[key])
 
 
-		db = DBSCAN(eps=0.02, min_samples=20).fit(positionData)
+		db = DBSCAN(eps=epsilon, min_samples=minPoints).fit(positionData)
 		nclusters = len(set(db.labels_)) - (1 if -1 in db.labels_ else 0)
 		rp.loginfo('...label %d (%d pts), found %d clusters', key, len(positionData), nclusters)
 
@@ -102,14 +105,16 @@ def analyze(data_):
 
 ##################################################
 if __name__ == '__main__':
+	# Setup node name
+	rp.init_node('pr2_cluster_analyzer', anonymous=False)
+
 	try:
 		# Load config file
 		with open(utils.getConfigPath(), 'r') as f:
 			config = yaml.load(f)
 			debug = config['analyzerDebug']
-
-		# Setup node name
-		rp.init_node('pr2_cluster_analyzer', anonymous=False)
+			epsilon = config['analyzer']['epsilon']
+			minPoints = config['analyzer']['minPoints']
 
 		# Initialize published topic
 		publisher = rp.Publisher('/pr2_grasping/grasping_data', GraspingData, queue_size=10)

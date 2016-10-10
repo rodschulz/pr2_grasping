@@ -41,6 +41,13 @@ labeler:
 
 
 ##### grasper node options #####
+analyzer:
+    # point's neighborhood size (query radius)
+    epsilon: 0.01
+    # min number of points in a point's neighborhood to be considered as a high density zone
+    minPoints: 20
+
+##### grasper node options #####
 grasper:
     # arm used for grasping tasks
     arm: right # right or left
