@@ -24,7 +24,7 @@
 class GraspingUtils
 {
 public:
-	// Returns the full path of the package's configuration file
+	/**************************************************/
 	static inline std::string getConfigPath()
 	{
 		std::string packagePath = ros::package::getPath(PACKAGE_NAME);
@@ -33,7 +33,7 @@ public:
 	}
 
 
-	// Gets the transformation between the given reference systems
+	/**************************************************/
 	static inline bool getTransformation(tf::StampedTransform &transform_,
 										 const tf::TransformListener *tfListener_,
 										 const std::string &target_,
@@ -55,7 +55,7 @@ public:
 	}
 
 
-	// Transforms a pose between the given source and target reference frames
+	/**************************************************/
 	static inline geometry_msgs::Point transformPoint(const tf::TransformListener *tfListener_,
 			const std::string &target_,
 			const std::string &source_,
@@ -73,7 +73,7 @@ public:
 	}
 
 
-	// Clips the given cloud using a plane at the given Z
+	/**************************************************/
 	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 			const tf::StampedTransform &transformation,
 			const float clippingZ_,
@@ -112,7 +112,7 @@ public:
 	}
 
 
-	// Downsamples the given cloud
+	/**************************************************/
 	static inline void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 									   const float voxelSize_,
 									   pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_)
@@ -124,7 +124,7 @@ public:
 	}
 
 
-	// Generates a pose structure with the given data
+	/**************************************************/
 	static inline geometry_msgs::Pose genPose(const float x_,
 			const float y_,
 			const float z_,
@@ -147,7 +147,6 @@ public:
 
 		return pose;
 	}
-
 
 private:
 	// Constructor

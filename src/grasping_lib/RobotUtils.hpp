@@ -8,6 +8,8 @@
 #include <string>
 #include <ros/ros.h>
 #include <boost/algorithm/string.hpp>
+#include <moveit/move_group_interface/move_group.h>
+
 
 enum Effector
 {
@@ -18,6 +20,9 @@ enum Effector
 
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_footprint"
+
+
+typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 
 
 // Class implementing utilities for robot interaction
@@ -41,6 +46,7 @@ public:
 		}
 	}
 
+
 	/**************************************************/
 	static inline std::pair<std::string, std::string> getEffectorNames(const std::string &arm_)
 	{
@@ -56,6 +62,7 @@ public:
 			return getEffectorNames(RIGHT_ARM);
 		}
 	}
+
 
 	/**************************************************/
 	static inline std::string getGripperTopic(const std::string &arm_)

@@ -76,7 +76,7 @@ bool moveArms()
 
 	// group to plane movement for both arms
 	moveit::planning_interface::MoveGroup armsGroup("arms");
-	armsGroup.setPoseReferenceFrame("base_link");
+	armsGroup.setPoseReferenceFrame(FRAME_BASE);
 
 	// right arm pose
 	geometry_msgs::Pose rightArmPose;
@@ -103,17 +103,34 @@ bool moveArms()
 	// plan the trajectory
 	moveit::planning_interface::MoveGroup::Plan armsPlan;
 	ROS_INFO("...planing arms trajectory");
-	bool planningOk = armsGroup.plan(armsPlan);
-	ROS_INFO("...trajectory plan %s", planningOk ? "SUCCESSFUL" : "FAILED");
+
+	int counter = 0;
+	while (!armsGroup.plan(armsPlan))
+	{
+		ROS_INFO(".....planning failed, retrying");
+		ros::Duration(0.5).sleep();
+		armsGroup.setPoseTarget(armsGroup.getRandomPose());
+		armsGroup.move();
+
+		ros::Duration(0.5).sleep();
+		armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
+		armsGroup.setPoseTarget(leftArmPose, "l_wrist_roll_link");
+
+		if (++counter > 25)
+		{
+			ROS_INFO("...too many retries, stopping");
+			break;
+		}
+	}
+	ROS_INFO("...trajectory plan %s", planningOk ? "" : "FAILED");
 
 	// move the arms
 	if (planningOk)
 	{
 		ROS_INFO("...moving arms");
 		armsGroup.move();
+		ROS_INFO("...arms movement completed");
 	}
-
-	ROS_INFO("...arms movement completed");
 
 	return planningOk;
 }
@@ -150,7 +167,7 @@ void moveHead()
 
 	// the target point, expressed in the given frame
 	geometry_msgs::PointStamped targetPoint;
-	targetPoint.header.frame_id = "base_link";
+	targetPoint.header.frame_id = FRAME_BASE;
 	targetPoint.point.x = Config::get()["setup"]["headTarget"]["x"].as<float>(0.9);
 	targetPoint.point.y = Config::get()["setup"]["headTarget"]["y"].as<float>(0.0);
 	targetPoint.point.z = Config::get()["setup"]["headTarget"]["z"].as<float>(0.5);
