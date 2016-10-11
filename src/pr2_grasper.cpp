@@ -10,11 +10,10 @@
 #include <pr2_grasping/CloudLabeler.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <control_msgs/GripperCommandAction.h>
 #include <control_msgs/GripperCommandGoal.h>
 #include <actionlib/client/simple_action_client.h>
-#include <moveit/move_group_interface/move_group.h>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <shape_tools/solid_primitive_dims.h>
 #include <boost/signals2/mutex.hpp>
 #include <deque>
@@ -28,7 +27,6 @@
 
 
 // Pointer to a move group interface
-typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
 typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperClient;
 
 
@@ -309,24 +307,27 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			/********** STAGE 2.5: put the effector in front of the kinect **********/
-			effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
-			effector_->setPoseReferenceFrame(FRAME_BASE);
+			geometry_msgs::PoseStamped evalPose;
+			evalPose.header.frame_id = FRAME_BASE;
+			evalPose.pose = GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0);
+			effector_->setPoseTarget(evalPose);
 
 			ROS_INFO("...trying to move the object");
-			moveit::planning_interface::MoveGroup::Plan plan;
-			while (!effector_->plan(plan))
-			{
-				ROS_INFO(".....planning failed, retrying");
-				ros::Duration(0.5).sleep();
-				effector_->setPoseTarget(effector_->getRandomPose());
-				effector_->move();
+			RobotUtils::moveGroup(effector_, evalPose, 50);
+			// moveit::planning_interface::MoveGroup::Plan plan;
+			// while (!effector_->plan(plan))
+			// {
+			// 	ROS_INFO(".....planning failed, retrying");
+			// 	ros::Duration(0.5).sleep();
+			// 	effector_->setPoseTarget(effector_->getRandomPose());
+			// 	effector_->move();
 
-				ros::Duration(0.5).sleep();
-				effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
-				effector_->setPoseReferenceFrame(FRAME_BASE);
-			}
-			effector_->move();
-			ros::Duration(1).sleep();
+			// 	ros::Duration(0.5).sleep();
+			// 	effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
+			// 	effector_->setPoseReferenceFrame(FRAME_BASE);
+			// }
+			// effector_->move();
+			// ros::Duration(1).sleep();
 
 
 			/********** STAGE 2.6: check the grasping attempt result **********/

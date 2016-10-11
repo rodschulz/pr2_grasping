@@ -80,6 +80,44 @@ public:
 		}
 	}
 
+
+	/**************************************************/
+	static inline bool moveGroup(MoveGroupPtr &group_, const geometry_msgs::PoseStamped &pose_, const int maxRetries_ = -1)
+	{
+		int retries = 0;
+
+		// Plan the movement
+		moveit::planning_interface::MoveGroup::Plan plan;
+		bool planOk = group_->plan(plan);
+		while (!planOk)
+		{
+			ROS_INFO(".....planning failed, retrying");
+			ros::Duration(0.5).sleep();
+			group_->setPoseTarget(group_->getRandomPose());
+			group_->move();
+
+			ros::Duration(0.5).sleep();
+			group_->setPoseTarget(pose_);
+
+			if (maxRetries_ != -1 && ++retries > maxRetries_)
+			{
+				ROS_WARN(".....too many planning retries, aborting");
+				break;
+			}
+		}
+
+		// Perform the movement
+		bool moveOk = false;
+		if (planOk)
+		{
+			moveOk = group_->move();
+			ros::Duration(1).sleep();
+		}
+
+		return moveOk && planOk;
+	}
+
+
 private:
 	// Constructor
 	RobotUtils();
