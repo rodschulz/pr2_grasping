@@ -61,7 +61,6 @@ add_message_files(
 	FILES
 		GraspingData.msg
 		GraspingPoint.msg
-		GraspingPointArray.msg
 		ObjectCloudData.msg
 )
 
