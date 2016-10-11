@@ -77,7 +77,7 @@ public:
 	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 			const tf::StampedTransform &transformation,
 			const float clippingZ_,
-			pcl::PointCloud<pcl::PointXYZ>::Ptr &planeCloud_)
+			pcl::PointCloud<pcl::PointXYZ>::Ptr &planeCloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr())
 	{
 		tf::Vector3 point = transformation * tf::Vector3(0, 0, clippingZ_);
 

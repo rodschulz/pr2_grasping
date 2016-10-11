@@ -3,6 +3,7 @@
 labelerDebug: false
 analyzerDebug: false
 grasperDebug: false
+evaluatorDebug: false
 
 
 ##### setup node options #####
@@ -63,7 +64,11 @@ grasper:
 ##### evaluator node options #####
 evaluator:
     # height used to clip the cloud and evaluate if the object was grasped
-    clippingZ: 0.8
+    clippingPlaneZ: 0.8
+    # minimum number of positive poses o decide that a grasp was successful (1 to 4)
+    successThreshold: 2
+    # number of retries when moving the effector to the evaluation poses (-1 for no limit)
+    maxRetries: 30
 
 ########## descriptor params ##########
 
