@@ -21,19 +21,20 @@ setup:
       right: {x: 0.3, y: -0.5, z: 1.0}
       left: {x: 0.3, y: 0.5, z: 1.0}
 
-    # object re-spawning config
-    ignore: ['ground_plane', 'low_table', 'pr2']
-    modelsFile: 'models_locations.yaml'
+    # reset target config
+    type: reset # reset or respawn
+    ignore: [ground_plane, low_table, pr2]
+    modelsFile: models_locations.yaml
 
 
 ##### labeler node options #####
 labeler:
     # point cloud input topic
-    pointcloudTopic: '/head_mount_kinect/depth/points'
+    pointcloudTopic: /head_mount_kinect/depth/points
     # sampling voxel size
     voxelSize: 0.004
     # location of the BoW file
-    bowLocation: 'src/grasping/config/bow50_c7_1E-4_opencv.dat'
+    bowLocation: src/grasping/config/bow50_c7_1E-4_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.67
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
