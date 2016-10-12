@@ -49,6 +49,7 @@ analyzer:
     # min number of points in a point's neighborhood to be considered as a high density zone
     minPoints: 20
 
+
 ##### grasper node options #####
 grasper:
     # arm used for grasping tasks

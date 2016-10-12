@@ -9,7 +9,10 @@
 #include <ros/ros.h>
 #include <boost/algorithm/string.hpp>
 #include <moveit/move_group_interface/move_group.h>
-
+#include <actionlib/client/simple_action_client.h>
+#include <control_msgs/SingleJointPositionAction.h>
+#include <control_msgs/PointHeadAction.h>
+#include <control_msgs/GripperCommandAction.h>
 
 enum Effector
 {
@@ -23,6 +26,10 @@ enum Effector
 
 
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
+/***** Client types definitions *****/
+typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
+typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
+typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperClient;
 
 
 // Class implementing utilities for robot interaction

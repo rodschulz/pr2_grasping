@@ -7,9 +7,6 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <pr2_grasping/GazeboSetup.h>
-#include <actionlib/client/simple_action_client.h>
-#include <pr2_controllers_msgs/SingleJointPositionAction.h>
-#include <pr2_controllers_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <yaml-cpp/yaml.h>
@@ -19,11 +16,6 @@
 #include "GraspingUtils.hpp"
 #include "GazeboUtils.hpp"
 #include "RobotUtils.hpp"
-
-
-/***** Client types definitions *****/
-typedef actionlib::SimpleActionClient<pr2_controllers_msgs::SingleJointPositionAction> TorsoClient;
-typedef actionlib::SimpleActionClient<pr2_controllers_msgs::PointHeadAction> HeadClient;
 
 
 /***** Global variables *****/
@@ -58,7 +50,7 @@ void liftUpTorso()
 
 	ROS_INFO("Lifting up torso");
 
-	pr2_controllers_msgs::SingleJointPositionGoal torsoGoal;
+	control_msgs::SingleJointPositionGoal torsoGoal;
 	torsoGoal.position = Config::get()["setup"]["torsoPosition"].as<float>(0.18);
 	torsoGoal.min_duration = ros::Duration(1.0);
 	torsoGoal.max_velocity = 5.0;
@@ -178,7 +170,7 @@ void moveHead()
 	targetPoint.point.z = Config::get()["setup"]["headTarget"]["z"].as<float>(0.5);
 
 	// make the kinect x axis point at the desired position
-	pr2_controllers_msgs::PointHeadGoal goal;
+	control_msgs::PointHeadGoal goal;
 	goal.target = targetPoint;
 	goal.pointing_frame = "head_mount_kinect_rgb_link";
 	goal.pointing_axis.x = 1;

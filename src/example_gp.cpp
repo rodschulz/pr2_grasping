@@ -7,8 +7,6 @@
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 #include <actionlib/client/simple_action_client.h>
-#include <control_msgs/SingleJointPositionAction.h>
-#include <control_msgs/PointHeadAction.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <shape_tools/solid_primitive_dims.h>
@@ -19,9 +17,6 @@
 #define TARGET_OBJECT 		"target_object"
 #define SUPPORT_OBJECT 		"support_object"
 
-
-typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
-typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
 
 bool stopDisplacement = false;
 

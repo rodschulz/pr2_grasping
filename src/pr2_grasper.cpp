@@ -7,13 +7,12 @@
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/GazeboSetup.h>
+#include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/CloudLabeler.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <control_msgs/GripperCommandAction.h>
 #include <control_msgs/GripperCommandGoal.h>
-#include <actionlib/client/simple_action_client.h>
 #include <shape_tools/solid_primitive_dims.h>
 #include <boost/signals2/mutex.hpp>
 #include <deque>
@@ -24,10 +23,6 @@
 
 #define TARGET_OBJECT		"target_object"
 #define GRASP_ID			"target_grasp"
-
-
-// Pointer to a move group interface
-typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperClient;
 
 
 /***** Global variables *****/
@@ -164,13 +159,6 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.allowed_touch_objects.push_back(targetObject_);
 
 	return grasp;
-}
-
-
-/**************************************************/
-bool checkGraspResult()
-{
-	return true;
 }
 
 
@@ -331,8 +319,11 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			/********** STAGE 2.6: check the grasping attempt result **********/
-			bool result = checkGraspResult();
-			ROS_INFO("...grasping attempt %s", result ? "SUCCESSFUL" : "FAILED");
+			pr2_grasping::GraspEvaluator eval;
+			eval.request.effectorName = effector_->getName();
+			if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
+				ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
+			ros::Duration(1).sleep();
 
 
 			/********** STAGE 2.7: release the object **********/
@@ -357,10 +348,10 @@ void timerCallback(const ros::TimerEvent &event_,
 
 			/********** STAGE 2.9: restore the testing setup **********/
 			ROS_INFO("...restoring setup");
-			pr2_grasping::GazeboSetup srv;
-			srv.request.resetObject = true;
-			if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
-				ROS_INFO("...setup %s", srv.response.result ? "RESTORED" : "restore FAILED");
+			pr2_grasping::GazeboSetup setup;
+			setup.request.resetObject = true;
+			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
+				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
 			ros::Duration(1).sleep();
 
 
@@ -375,9 +366,9 @@ void timerCallback(const ros::TimerEvent &event_,
 	// Call the labeling service if no points are queued
 	if (queue.empty())
 	{
-		pr2_grasping::CloudLabeler srv;
-		if (ros::service::call("/pr2_grasping/cloud_labeler", srv))
-			ROS_INFO("...labeling %s", srv.response.result ? "SCHEDULED" : "NOT SCHEDULED");
+		pr2_grasping::CloudLabeler labeler;
+		if (ros::service::call("/pr2_grasping/cloud_labeler", labeler))
+			ROS_INFO("...labeling %s", labeler.response.result ? "SCHEDULED" : "NOT SCHEDULED");
 	}
 }
 
