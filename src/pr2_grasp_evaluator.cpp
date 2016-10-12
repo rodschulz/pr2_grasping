@@ -7,16 +7,9 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pr2_grasping/GraspEvaluator.h>
-// #include <moveit/move_group_interface/move_group.h>
-// #include <moveit/planning_scene_interface/planning_scene_interface.h>
-
-// #include <pcl_ros/point_cloud.h>
-// #include <pcl_ros/transforms.h>
-// #include <pcl_ros/impl/transforms.hpp>
-// #include <pcl/point_types.h>
-// #include <pcl_conversions/pcl_conversions.h>
-// #include <pcl/common/common.h>
-
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/transforms.h>
+#include <pcl/point_types.h>
 #include <boost/signals2/mutex.hpp>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
@@ -25,9 +18,11 @@
 
 /***** Global variables *****/
 boost::mutex mutex;
-volatile bool evaluateCloud = false;
+bool evaluateCloud = false;
 tf::TransformListener *tfListener;
-volatile std::vector<bool> status;
+std::vector<bool> status;
+int successThreshold  = 1;
+int maxRetries = -1;
 
 /***** Debug variables *****/
 ros::Publisher planePublisher;
@@ -39,13 +34,15 @@ inline int countTrue(const std::vector<bool> &array_)
 	int count = 0;
 	for (std::vector<bool>::const_iterator it = array_.begin(); it != array_.end(); it++)
 		count += (*it ? 1 : 0);
-	
+
 	return count;
 }
 
 
 /**************************************************/
-void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_, const float clippingPlaneZ_, const bool debugEnabled_)
+void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
+				   const float clippingPlaneZ_,
+				   const bool debugEnabled_)
 {
 	if (evaluateCloud)
 	{
@@ -66,20 +63,20 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_, const float cli
 		ROS_DEBUG("Wait transformation");
 		tf::StampedTransform transformation;
 		while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
-		
+
 		ROS_DEBUG("Clipping cloud");
 		pcl::PointCloud<pcl::PointXYZ>::Ptr plane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
 		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(cloudXYZ, transformation, clippingPlaneZ_, plane);
 
 		// Publish debug data
-		if (debugEnabled)
+		if (debugEnabled_)
 			planePublisher.publish(plane);
 
 		// Check if there's any point after clipping
-		 graspState.push_back(!filtered->empty());
+		graspState.push_back(!filtered->empty());
 
 		// If some clouds have been evaluated, then set the result
-		if(graspState.size() == 3)
+		if (graspState.size() == 3)
 		{
 			// Prevent more clouds to be evaluated and set the result
 			mutex.lock();
@@ -96,9 +93,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_, const float cli
 
 /**************************************************/
 bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
-					pr2_grasping::GraspEvaluator::Response &response_,
-					const int maxRetries_,
-					const int successThreshold_)
+					  pr2_grasping::GraspEvaluator::Response &response_)
 {
 	// Clear the status vector to begin a new evaluation
 	mutex.lock();
@@ -112,17 +107,17 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 
-	// Generate the base of the pose 
+	// Generate the base of the pose
 	geometry_msgs::PoseStamped gripperPose;
 	gripperPose.header.frame_id = "r_wrist_roll_link";
 
 	// Iterate testing a set of poses to evaluate the grasping result
-	while(status.size() < 4)
+	while (status.size() < 4)
 	{
 		// Move the gripper to the evaluation pose
 		ROS_DEBUG_STREAM("Moving gripper to pose " << status.size());
 		gripperPose.pose = GraspingUtils::genPose(0, 0, 0, DEG2RAD(90 * status.size()), 1, 0, 0);
-		if(!RobotUtils::moveGroup(effector, gripperPose, maxRetries_))
+		if (!RobotUtils::moveGroup(effector, gripperPose, maxRetries))
 		{
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
@@ -136,14 +131,14 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		// Wait until the pose was evaluated
 		ROS_DEBUG_STREAM("Testing gripper pose " << status.size());
 		size_t current = status.size();
-		while(current == status.size())
+		while (current == status.size())
 			ros::Duration(1.0).sleep();
 	}
 
 	// If at least 2 poses give a positive result, then the grasping was successful
 	int count = countTrue(status);
 	ROS_INFO_STREAM("Positive tested poses: " << count);
-	response_.result = count >= successThreshold_;
+	response_.result = count >= successThreshold;
 	return true;
 }
 
@@ -163,14 +158,14 @@ int main(int argn_, char** argv_)
 
 	bool debugEnabled = Config::get()["evaluatorDebug"].as<bool>();
 	float clippingPlaneZ = Config::get()["evaluator"]["clippingPlaneZ"].as<float>();
-	int successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
-	int maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
+	successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
+	maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
 
 	// Set subscription
 	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>("/move_group/filtered_cloud", 1, boost::bind(cloudCallback, _1, clippingPlaneZ, debugEnabled));
 
 	// Set service
-	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, ));
+	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/grasp_evaluator", evaluateGrasping);
 
 	// Set debug behavior
 	if (debugEnabled)

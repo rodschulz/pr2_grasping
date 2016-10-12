@@ -12,6 +12,7 @@
 #include <pcl/filters/impl/plane_clipper3D.hpp>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
 
@@ -77,7 +78,7 @@ public:
 	static inline pcl::PointCloud<pcl::PointXYZ>::Ptr basicPlaneClippingZ(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 			const tf::StampedTransform &transformation,
 			const float clippingZ_,
-			pcl::PointCloud<pcl::PointXYZ>::Ptr &planeCloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr())
+			pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr())
 	{
 		tf::Vector3 point = transformation * tf::Vector3(0, 0, clippingZ_);
 
