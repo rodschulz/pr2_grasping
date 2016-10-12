@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN
 from sensor_msgs.msg import PointCloud2
 from pr2_grasping.msg import GraspingData
 from pr2_grasping.msg import GraspingPoint
-from pr2_grasping.msg import GraspingPointArray
+# from pr2_grasping.msg import GraspingPointArray
 from pr2_grasping.msg import ObjectCloudData
 
 

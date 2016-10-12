@@ -37,7 +37,7 @@ labeler:
     # location of the BoW file
     bowLocation: src/grasping/config/bow50_c7_1E-4_opencv.dat
     # clipping plane position in Z axis
-    clippingPlaneZ: 0.67
+    clippingPlaneZ: 0.66
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
     writeClouds: false
 
@@ -65,9 +65,9 @@ grasper:
 ##### evaluator node options #####
 evaluator:
     # height used to clip the cloud and evaluate if the object was grasped
-    clippingPlaneZ: 0.8
+    clippingPlaneZ: 0.9
     # minimum number of positive poses o decide that a grasp was successful (1 to 4)
-    successThreshold: 2
+    successThreshold: 1
     # number of retries when moving the effector to the evaluation poses (-1 for no limit)
     maxRetries: 30
 

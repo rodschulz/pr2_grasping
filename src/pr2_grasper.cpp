@@ -294,39 +294,15 @@ void timerCallback(const ros::TimerEvent &event_,
 			ros::Duration(0.5).sleep();
 
 
-			/********** STAGE 2.5: put the effector in front of the kinect **********/
-			geometry_msgs::PoseStamped evalPose;
-			evalPose.header.frame_id = FRAME_BASE;
-			evalPose.pose = GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0);
-			effector_->setPoseTarget(evalPose);
-
-			ROS_INFO("...trying to move the object");
-			RobotUtils::moveGroup(effector_, evalPose, 50);
-			// moveit::planning_interface::MoveGroup::Plan plan;
-			// while (!effector_->plan(plan))
-			// {
-			// 	ROS_INFO(".....planning failed, retrying");
-			// 	ros::Duration(0.5).sleep();
-			// 	effector_->setPoseTarget(effector_->getRandomPose());
-			// 	effector_->move();
-
-			// 	ros::Duration(0.5).sleep();
-			// 	effector_->setPoseTarget(GraspingUtils::genPose(0.5, 0.0, 1.0, DEG2RAD(-90), 0, 1, 0));
-			// 	effector_->setPoseReferenceFrame(FRAME_BASE);
-			// }
-			// effector_->move();
-			// ros::Duration(1).sleep();
-
-
-			/********** STAGE 2.6: check the grasping attempt result **********/
+			/********** STAGE 2.5: check the grasping attempt result **********/
 			pr2_grasping::GraspEvaluator eval;
 			eval.request.effectorName = effector_->getName();
 			if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
 				ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
-			ros::Duration(1).sleep();
+			ros::Duration(0.5).sleep();
 
 
-			/********** STAGE 2.7: release the object **********/
+			/********** STAGE 2.6: release the object **********/
 			/** This MUST be done before restoring the setup, otherwise the
 			robot gets moved when the object's position is reseted **/
 			ROS_INFO("...releasing object");
@@ -334,7 +310,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			ros::Duration(1).sleep();
 
 
-			/********** STAGE 2.8: remove collision objects **********/
+			/********** STAGE 2.7: remove collision objects **********/
 			ROS_INFO("...detaching collision objects");
 			effector_->detachObject(TARGET_OBJECT);
 			ros::Duration(1).sleep();
@@ -346,7 +322,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			ros::Duration(1).sleep();
 
 
-			/********** STAGE 2.9: restore the testing setup **********/
+			/********** STAGE 2.8: restore the testing setup **********/
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
 			setup.request.resetObject = true;

@@ -16,6 +16,9 @@
 #include "RobotUtils.hpp"
 
 
+#define CLOUDS_FOR_EVALUATION	3
+
+
 /***** Global variables *****/
 boost::mutex mutex;
 bool evaluateCloud = false;
@@ -25,7 +28,7 @@ int successThreshold  = 1;
 int maxRetries = -1;
 
 /***** Debug variables *****/
-ros::Publisher planePublisher;
+ros::Publisher cloudPublisher, planePublisher;
 
 
 /**************************************************/
@@ -49,39 +52,55 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 		// Array to store evaluations
 		static std::vector<bool> graspState;
 
+		ROS_DEBUG("===== Begining cloud evaluation =====");
+
 		/***** STAGE 1: retrieve data *****/
-		ROS_DEBUG("Transforming cloud from ROS to PCL");
+		ROS_DEBUG("...transforming cloud from ROS to PCL");
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ(new pcl::PointCloud<pcl::PointXYZ>());
 		pcl::fromROSMsg(*msg_, *cloudXYZ);
 		if (cloudXYZ->empty())
 		{
-			ROS_WARN("Cloud empty after transformation to PCL, skipping");
+			ROS_WARN("...cloud empty after transformation to PCL, skipping");
 			return;
 		}
 
 		/***** STAGE 2: transform and remove data *****/
-		ROS_DEBUG("Wait transformation");
 		tf::StampedTransform transformation;
 		while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
 
-		ROS_DEBUG("Clipping cloud");
+		ROS_DEBUG("...clipping cloud");
 		pcl::PointCloud<pcl::PointXYZ>::Ptr plane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
 		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(cloudXYZ, transformation, clippingPlaneZ_, plane);
 
 		// Publish debug data
 		if (debugEnabled_)
-			planePublisher.publish(plane);
+		{
+			sensor_msgs::PointCloud2 cloudMsg;
+			pcl::toROSMsg<pcl::PointXYZ>(*filtered, cloudMsg);
+			cloudMsg.header.stamp = ros::Time::now();
+			cloudMsg.header.frame_id = msg_->header.frame_id;
+			cloudPublisher.publish(cloudMsg);
+
+			sensor_msgs::PointCloud2 planeMsg;
+			pcl::toROSMsg<pcl::PointXYZ>(*plane, planeMsg);
+			planeMsg.header.stamp = ros::Time::now();
+			planeMsg.header.frame_id = msg_->header.frame_id;
+			planePublisher.publish(planeMsg);
+		}
 
 		// Check if there's any point after clipping
 		graspState.push_back(!filtered->empty());
+		ROS_INFO("...filtered cloud size: %zu pts", filtered->size());
 
 		// If some clouds have been evaluated, then set the result
-		if (graspState.size() == 3)
+		if (graspState.size() == CLOUDS_FOR_EVALUATION)
 		{
-			// Prevent more clouds to be evaluated and set the result
+			bool result = countTrue(graspState) >= (CLOUDS_FOR_EVALUATION / 2.0);
+			ROS_INFO("...position tested: %s", result ? "POSITIVE" : "NEGATIVE");
+
 			mutex.lock();
 			evaluateCloud = false;
-			status.push_back(countTrue(graspState) >= 1);
+			status.push_back(result);
 			mutex.unlock();
 
 			// Clear the state vector
@@ -107,32 +126,47 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 
-	// Generate the base of the pose
-	geometry_msgs::PoseStamped gripperPose;
-	gripperPose.header.frame_id = "r_wrist_roll_link";
+	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 1, 0));
+	Eigen::Quaternionf incremental = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(0, 1, 0), Eigen::Vector3f(0, 0, -1));
+
+	geometry_msgs::PoseStamped evalPose;
+	evalPose.header.frame_id = FRAME_BASE;
+	evalPose.pose.position.x = 0.5;
+	evalPose.pose.position.y = -0.15;
+	evalPose.pose.position.z = 1.1;
 
 	// Iterate testing a set of poses to evaluate the grasping result
 	while (status.size() < 4)
 	{
-		// Move the gripper to the evaluation pose
-		ROS_DEBUG_STREAM("Moving gripper to pose " << status.size());
-		gripperPose.pose = GraspingUtils::genPose(0, 0, 0, DEG2RAD(90 * status.size()), 1, 0, 0);
-		if (!RobotUtils::moveGroup(effector, gripperPose, maxRetries))
+		evalPose.pose.orientation.w = rotation.w();
+		evalPose.pose.orientation.x = rotation.x();
+		evalPose.pose.orientation.y = rotation.y();
+		evalPose.pose.orientation.z = rotation.z();
+
+		ROS_DEBUG_STREAM("*** Moving gripper to pose " << status.size());
+		effector->setPoseTarget(evalPose);
+		if (!RobotUtils::move(effector, evalPose, maxRetries))
 		{
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
 		}
 
-		// Schedule the evaluation from the sensorial data
+		// Schedule the evaluation over the point clouds
 		mutex.lock();
 		evaluateCloud = true;
 		mutex.unlock();
 
 		// Wait until the pose was evaluated
-		ROS_DEBUG_STREAM("Testing gripper pose " << status.size());
 		size_t current = status.size();
+		ROS_DEBUG_STREAM("Testing gripper pose " << current);
 		while (current == status.size())
 			ros::Duration(1.0).sleep();
+
+		// Check early finish
+		if (countTrue(status) >= successThreshold)
+			break;
+
+		rotation = rotation * incremental;
 	}
 
 	// If at least 2 poses give a positive result, then the grasping was successful
@@ -173,6 +207,7 @@ int main(int argn_, char** argv_)
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
+		cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_cloud", 1);
 		planePublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane", 1);
 	}
 
