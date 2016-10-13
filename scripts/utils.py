@@ -61,7 +61,9 @@ def plotData3D(data_, labels_, index_=-1, nclusters_=-1):
 	ax = fig.add_subplot(111, projection='3d')
 
 	classes = set(labels_)
-	colors = plt.cm.Spectral(np.linspace(0, 1, len(classes)))
+	# colors = plt.cm.Spectral(np.linspace(0, 1, len(classes)))
+	# colors = plt.cm.Set3(np.linspace(0, 1, 12))
+	colors = plt.cm.Set1(np.linspace(0, 1, 9))
 
 	for cls, col in zip(classes, colors):
 		if cls == -1:
