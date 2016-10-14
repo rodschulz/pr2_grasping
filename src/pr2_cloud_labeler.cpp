@@ -61,11 +61,12 @@ ros::Publisher limitsPublisher, planePublisher;
 
 
 /**************************************************/
-std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
+template <typename PointType>
+std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const typename pcl::PointCloud<PointType>::Ptr cloud_,
 		const std::string &frameId_)
 {
-	pcl::PointXYZ minPt, maxPt;
-	pcl::getMinMax3D<pcl::PointXYZ>(*cloud_, minPt, maxPt);
+	PointType minPt, maxPt;
+	pcl::getMinMax3D< PointType >(*cloud_, minPt, maxPt);
 
 	ros::Time nowStamp = ros::Time::now();
 
@@ -210,12 +211,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
+
 		// Transform the filtered cloud to base's frame
 		ROS_DEBUG("Transforming cloud from '%s' to '%s'", msg_->header.frame_id.c_str(), FRAME_BASE);
 		while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_BASE, msg_->header.frame_id));
 		pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
 		pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
-		std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits(transformed, FRAME_BASE);
+		std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits<pcl::PointXYZ>(transformed, FRAME_BASE);
 
 		if (debugEnabled_)
 		{
@@ -237,11 +239,20 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 		/***** STAGE 3: calculate relevant info *****/
 
+		// Calculate and update the cloud's viewpoint to perform a correct normals estimation
+		geometry_msgs::Point viewPoint = GraspingUtils::transformPoint(tfListener, FRAME_BASE, msg_->header.frame_id, geometry_msgs::Point());
+		transformed->sensor_origin_.x() = viewPoint.x;
+		transformed->sensor_origin_.y() = viewPoint.y;
+		transformed->sensor_origin_.z() = viewPoint.z;
+
+
 		// Estimate normals and generate an unique cloud
 		ROS_INFO("...estimating normals");
 		pcl::PointCloud<pcl::Normal>::Ptr normals = CloudUtils::estimateNormals(transformed, Config::getNormalEstimationRadius());
 		pcl::PointCloud<pcl::PointNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointNormal>());
 		pcl::concatenateFields(*transformed, *normals, *cloud);
+		cloud->sensor_origin_ = transformed->sensor_origin_;
+
 
 		// Descriptor dense evaluation over the point cloud
 		ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
