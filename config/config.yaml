@@ -1,9 +1,9 @@
 ---
 # flag to enable/disable debug
-labelerDebug: false
-analyzerDebug: false
-grasperDebug: false
-evaluatorDebug: false
+labelerDebug: true
+analyzerDebug: true
+grasperDebug: true
+evaluatorDebug: true
 
 
 ##### setup node options #####
@@ -39,7 +39,7 @@ labeler:
     # clipping plane position in Z axis
     clippingPlaneZ: 0.66
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
-    writeClouds: false
+    writeClouds: true
 
 
 ##### grasper node options #####
@@ -49,7 +49,7 @@ analyzer:
     # min number of points in a point's neighborhood to be considered as a high density zone
     minPoints: 20
     # color palette used for the debug graph generation
-    palette: Set1 # Options are: Spectral, Set1, Set2, Set3
+    palette: Set3 # Options are: Spectral, Set1, Set2, Set3
 
 
 ##### grasper node options #####
@@ -67,11 +67,13 @@ grasper:
 ##### evaluator node options #####
 evaluator:
     # height used to clip the cloud and evaluate if the object was grasped
-    clippingPlaneZ: 0.9
+    clippingPlaneZ: 0.95
     # minimum number of positive poses o decide that a grasp was successful (1 to 4)
     successThreshold: 1
     # number of retries when moving the effector to the evaluation poses (-1 for no limit)
     maxRetries: 30
+    # position used to evaluate the grasping attempt (respect frame 'base_footprint')
+    position: {x: 0.45, y: -0, z: 0.95}
 
 ########## descriptor params ##########
 

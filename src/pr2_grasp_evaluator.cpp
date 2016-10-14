@@ -24,8 +24,6 @@ boost::mutex mutex;
 bool evaluateCloud = false;
 tf::TransformListener *tfListener;
 std::vector<bool> status;
-int successThreshold  = 1;
-int maxRetries = -1;
 
 /***** Debug variables *****/
 ros::Publisher cloudPublisher, planePublisher;
@@ -112,7 +110,12 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 /**************************************************/
 bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
-					  pr2_grasping::GraspEvaluator::Response &response_)
+					  pr2_grasping::GraspEvaluator::Response &response_,
+					  const float x_,
+					  const float y_,
+					  const float z_,
+					  const int successThreshold_,
+					  const int maxRetries_)
 {
 	// Clear the status vector to begin a new evaluation
 	mutex.lock();
@@ -126,14 +129,14 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 
-	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 1, 0));
+	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, 1));
 	Eigen::Quaternionf incremental = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(0, 1, 0), Eigen::Vector3f(0, 0, -1));
 
 	geometry_msgs::PoseStamped evalPose;
 	evalPose.header.frame_id = FRAME_BASE;
-	evalPose.pose.position.x = 0.5;
-	evalPose.pose.position.y = -0.15;
-	evalPose.pose.position.z = 1.1;
+	evalPose.pose.position.x = x_;
+	evalPose.pose.position.y = y_;
+	evalPose.pose.position.z = z_;
 
 	// Iterate testing a set of poses to evaluate the grasping result
 	while (status.size() < 4)
@@ -142,10 +145,20 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		evalPose.pose.orientation.x = rotation.x();
 		evalPose.pose.orientation.y = rotation.y();
 		evalPose.pose.orientation.z = rotation.z();
+		effector->setPoseTarget(evalPose);
 
 		ROS_DEBUG_STREAM("*** Moving gripper to pose " << status.size());
-		effector->setPoseTarget(evalPose);
-		if (!RobotUtils::move(effector, evalPose, maxRetries))
+		ROS_DEBUG("f:%s - p:(%.3f, %.3f, %.3f) - o:(%.3f, %.3f, %.3f, %.3f)",
+				  evalPose.header.frame_id.c_str(),
+				  evalPose.pose.position.x,
+				  evalPose.pose.position.y,
+				  evalPose.pose.position.z,
+				  evalPose.pose.orientation.x,
+				  evalPose.pose.orientation.y,
+				  evalPose.pose.orientation.z,
+				  evalPose.pose.orientation.w);
+
+		if (!RobotUtils::move(effector, evalPose, maxRetries_))
 		{
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
@@ -163,16 +176,19 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 			ros::Duration(1.0).sleep();
 
 		// Check early finish
-		if (countTrue(status) >= successThreshold)
+		if (countTrue(status) >= successThreshold_)
 			break;
 
 		rotation = rotation * incremental;
 	}
 
-	// If at least 2 poses give a positive result, then the grasping was successful
+	// Check if there's enough POSITIVE tested poses
 	int count = countTrue(status);
-	ROS_INFO_STREAM("Positive tested poses: " << count);
-	response_.result = count >= successThreshold;
+	response_.result = count >= successThreshold_;
+
+	ROS_DEBUG_STREAM("Positive tested poses: " << count);
+	ROS_INFO("Grasp result: %s", response_.result ? "SUCCESSFUL" : "FAILED");
+
 	return true;
 }
 
@@ -192,14 +208,17 @@ int main(int argn_, char** argv_)
 
 	bool debugEnabled = Config::get()["evaluatorDebug"].as<bool>();
 	float clippingPlaneZ = Config::get()["evaluator"]["clippingPlaneZ"].as<float>();
-	successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
-	maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
+	int successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
+	int maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
+	float x = Config::get()["evaluator"]["position"]["x"].as<float>();
+	float y = Config::get()["evaluator"]["position"]["y"].as<float>();
+	float z = Config::get()["evaluator"]["position"]["z"].as<float>();
 
 	// Set subscription
 	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>("/move_group/filtered_cloud", 1, boost::bind(cloudCallback, _1, clippingPlaneZ, debugEnabled));
 
 	// Set service
-	ros::ServiceServer evaluationService = handler.advertiseService("/pr2_grasping/grasp_evaluator", evaluateGrasping);
+	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, x, y, z, successThreshold, maxRetries));
 
 	// Set debug behavior
 	if (debugEnabled)

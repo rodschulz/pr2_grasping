@@ -409,7 +409,7 @@ int main(int _argn, char **_argv)
 
 
 	// Asynchronous spinning
-	ros::AsyncSpinner spinner(2); // Use 2 threads
+	ros::AsyncSpinner spinner(3);
 	spinner.start();
 	ros::waitForShutdown();
 
