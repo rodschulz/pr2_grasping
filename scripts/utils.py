@@ -56,14 +56,30 @@ def extractByDimension(data_, dim_=0):
 
 
 ##################################################
-def plotData3D(data_, labels_, index_=-1, nclusters_=-1):
+def getPalette(paletteName_):
+	if paletteName_.lower() == 'spectral':
+		return plt.cm.Spectral(np.linspace(0, 1, 5))
+
+	elif paletteName_.lower() == 'set1':
+		return plt.cm.Set1(np.linspace(0, 1, 9))
+
+	elif paletteName_.lower() == 'set2':
+		return plt.cm.Set2(np.linspace(0, 1, 7))
+
+	elif paletteName_.lower() == 'set3':
+		return plt.cm.Set3(np.linspace(0, 1, 12))
+
+	else:
+		return plt.cm.Set3(np.linspace(0, 1, 12))
+
+
+##################################################
+def plotData3D(data_, labels_, index_=-1, nclusters_=-1, palette_ = ''):
 	fig = plt.figure()
 	ax = fig.add_subplot(111, projection='3d')
 
 	classes = set(labels_)
-	# colors = plt.cm.Spectral(np.linspace(0, 1, len(classes)))
-	# colors = plt.cm.Set3(np.linspace(0, 1, 12))
-	colors = plt.cm.Set1(np.linspace(0, 1, 9))
+	colors = getPalette(palette_)
 
 	for cls, col in zip(classes, colors):
 		if cls == -1:

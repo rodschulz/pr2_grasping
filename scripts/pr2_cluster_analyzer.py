@@ -16,6 +16,7 @@ from pr2_grasping.msg import ObjectCloudData
 publisher = None
 epsilon = 0.01
 minPoints = 10
+palette = 'Set1'
 
 ##### Debug variables flag #####
 debug = False
@@ -86,7 +87,7 @@ def analyze(data_):
 
 			# Generate debug data if requested
 			if debug:
-				utils.plotData3D(positionData, db.labels_, key, nclusters)
+				utils.plotData3D(positionData, db.labels_, key, nclusters, palette)
 
 
 	# Publish the synthesized grasping points
@@ -115,6 +116,7 @@ if __name__ == '__main__':
 			debug = config['analyzerDebug']
 			epsilon = config['analyzer']['epsilon']
 			minPoints = config['analyzer']['minPoints']
+			palette = config['analyzer']['palette']
 
 		# Initialize published topic
 		publisher = rp.Publisher('/pr2_grasping/grasping_data', GraspingData, queue_size=10)

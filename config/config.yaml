@@ -48,6 +48,8 @@ analyzer:
     epsilon: 0.01
     # min number of points in a point's neighborhood to be considered as a high density zone
     minPoints: 20
+    # color palette used for the debug graph generation
+    palette: Set1 # Options are: Spectral, Set1, Set2, Set3
 
 
 ##### grasper node options #####
