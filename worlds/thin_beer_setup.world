@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://thin_beer</uri>
 			<name>thin_beer</name>
-			<pose>0.75 0 0.8 0 0 0</pose>
+			<pose>0.69 0 0.8 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->

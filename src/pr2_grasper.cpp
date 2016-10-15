@@ -131,7 +131,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.pre_grasp_approach.direction.vector.y = 0;
 	grasp.pre_grasp_approach.direction.vector.z = 0;
 	grasp.pre_grasp_approach.min_distance = 0.05;
-	grasp.pre_grasp_approach.desired_distance = 0.18;
+	grasp.pre_grasp_approach.desired_distance = 0.15;
 
 
 	grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
@@ -152,8 +152,8 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.post_grasp_retreat.direction.vector.x = 0;
 	grasp.post_grasp_retreat.direction.vector.y = 0;
 	grasp.post_grasp_retreat.direction.vector.z = 1;
-	grasp.post_grasp_retreat.min_distance = 0.08;
-	grasp.post_grasp_retreat.desired_distance = 0.3;
+	grasp.post_grasp_retreat.min_distance = 0.05;
+	grasp.post_grasp_retreat.desired_distance = 0.2;
 
 	grasp.allowed_touch_objects.clear();
 	grasp.allowed_touch_objects.push_back(targetObject_);
@@ -165,8 +165,8 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 /**************************************************/
 void releaseObject(MoveGroupPtr &effector_)
 {
-	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
-		ros::console::notifyLoggerLevelsChanged();
+	// if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
+	// ros::console::notifyLoggerLevelsChanged();
 
 	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
 	while (!client->waitForServer(ros::Duration(5.0)))
@@ -290,11 +290,20 @@ void timerCallback(const ros::TimerEvent &event_,
 			std::vector<moveit_msgs::Grasp> grasps;
 			grasps.push_back(grasp);
 			moveit::planning_interface::MoveItErrorCode errCode = effector_->pick(TARGET_OBJECT, grasps);
-			ROS_INFO("...grasp finished (error code: %d)", errCode.val);
-			ros::Duration(0.5).sleep();
+			ROS_INFO("...attempt finished (code: %d)", errCode.val);
+
+
+			// Skip the rest if the planning failed
+			if (errCode == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
+					errCode == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
+			{
+				ROS_INFO("...planning attempt failed, skipping");
+				ros::Duration(0.5).sleep();// little wait to be able to read the message
+			}
 
 
 			/********** STAGE 2.5: check the grasping attempt result **********/
+			ROS_INFO("...evaluating result");
 			pr2_grasping::GraspEvaluator eval;
 			eval.request.effectorName = effector_->getName();
 			if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
@@ -307,19 +316,19 @@ void timerCallback(const ros::TimerEvent &event_,
 			robot gets moved when the object's position is reseted **/
 			ROS_INFO("...releasing object");
 			releaseObject(effector_);
-			ros::Duration(1).sleep();
+			ros::Duration(0.5).sleep();
 
 
 			/********** STAGE 2.7: remove collision objects **********/
 			ROS_INFO("...detaching collision objects");
 			effector_->detachObject(TARGET_OBJECT);
-			ros::Duration(1).sleep();
+			ros::Duration(0.5).sleep();
 
 			ROS_INFO("...removing collision objects");
 			std::vector<std::string> ids;
 			ids.push_back(TARGET_OBJECT);
 			planningScene_->removeCollisionObjects(ids);
-			ros::Duration(1).sleep();
+			ros::Duration(0.5).sleep();
 
 
 			/********** STAGE 2.8: restore the testing setup **********/
@@ -328,7 +337,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			setup.request.resetObject = true;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
 				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
-			ros::Duration(1).sleep();
+			ros::Duration(0.5).sleep();
 
 
 			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
@@ -389,6 +398,8 @@ int main(int _argn, char **_argv)
 	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
+	effector->allowReplanning(true);
+	effector->setNumPlanningAttempts(5);
 
 
 	// Set subscriptions
