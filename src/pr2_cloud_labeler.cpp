@@ -284,7 +284,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 		// Write debug data
 		static bool cloudsWritten = false;
-		if (!cloudsWritten && writeClouds_)
+		if (debugEnabled_ && writeClouds_ && !cloudsWritten)
 		{
 			Writer::writeClusteredCloud("./cluster_colored.pcd", cloud, labels);
 			pcl::io::savePCDFileASCII("./labeled.pcd", *labeledCloud);
