@@ -165,12 +165,11 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 /**************************************************/
 void releaseObject(MoveGroupPtr &effector_)
 {
-	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
+	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
 		ros::console::notifyLoggerLevelsChanged();
 
 	// Stop any previous movement
 	effector_->stop();
-
 
 	// Move the effector to an adequate pose to release the object
 	ROS_INFO(".....moving effector to release pose");
