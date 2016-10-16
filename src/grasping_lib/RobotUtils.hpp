@@ -37,7 +37,7 @@ class RobotUtils
 {
 public:
 	/**************************************************/
-	static inline std::pair<std::string, std::string> getEffectorNames(const Effector &arm_)
+	static std::pair<std::string, std::string> getEffectorNames(const Effector &arm_)
 	{
 		switch (arm_)
 		{
@@ -55,7 +55,7 @@ public:
 
 
 	/**************************************************/
-	static inline std::pair<std::string, std::string> getEffectorNames(const std::string &arm_)
+	static std::pair<std::string, std::string> getEffectorNames(const std::string &arm_)
 	{
 		if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
 			return getEffectorNames(RIGHT_ARM);
@@ -72,7 +72,7 @@ public:
 
 
 	/**************************************************/
-	static inline std::string getGripperTopic(const std::string &arm_)
+	static std::string getGripperTopic(const std::string &arm_)
 	{
 		if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
 			return "r_gripper_controller/gripper_action";
@@ -89,8 +89,8 @@ public:
 
 
 	/**************************************************/
-	static inline bool planAndMove(MoveGroupPtr &group_,
-								   const int maxRetries_ = -1)
+	static bool planAndMove(MoveGroupPtr &group_,
+							const int maxRetries_ = -1)
 	{
 		int retries = 0;
 		moveit::planning_interface::MoveGroup::Plan plan;
@@ -118,9 +118,9 @@ public:
 
 
 	/**************************************************/
-	static inline bool move(MoveGroupPtr &group_,
-							const geometry_msgs::PoseStamped &pose_,
-							const int maxRetries_ = -1)
+	static bool move(MoveGroupPtr &group_,
+					 const geometry_msgs::PoseStamped &pose_,
+					 const int maxRetries_ = -1)
 	{
 		int retries = 0;
 		while (!group_->move())
@@ -138,6 +138,44 @@ public:
 		return true;
 	}
 
+
+	/**************************************************/
+	static void moveHead(const float x_, const float y_, const float z_)
+	{
+		// define action client
+		HeadClient *headClient = new HeadClient("/head_traj_controller/point_head_action", true);
+
+		// wait for the action server to come up
+		while (!headClient->waitForServer(ros::Duration(5.0)))
+			ROS_INFO("Waiting for the point_head_action server to come up");
+
+		ROS_INFO("Moving head");
+
+		// the target point, expressed in the given frame
+		geometry_msgs::PointStamped targetPoint;
+		targetPoint.header.frame_id = FRAME_BASE;
+		targetPoint.point.x = x_;
+		targetPoint.point.y = y_;
+		targetPoint.point.z = z_;
+
+		// make the kinect x axis point at the desired position
+		control_msgs::PointHeadGoal goal;
+		goal.target = targetPoint;
+		goal.pointing_frame = "head_mount_kinect_rgb_link";
+		goal.pointing_axis.x = 1;
+		goal.pointing_axis.y = 0;
+		goal.pointing_axis.z = 0;
+
+		// displacement limits (at least 1 sec and no faster than 1 rad/s)
+		// goal.min_duration = ros::Duration(1);
+		// goal.max_velocity = 1.0;
+
+		ROS_INFO("...sending head goal");
+		headClient->sendGoal(goal);
+		headClient->waitForResult(ros::Duration(60));
+
+		// ROS_INFO("...head moved");
+	}
 
 private:
 	// Constructor

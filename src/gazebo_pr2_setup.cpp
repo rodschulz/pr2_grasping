@@ -153,37 +153,9 @@ void moveBase()
 /**************************************************/
 void moveHead()
 {
-	// define action client
-	HeadClient *headClient = new HeadClient("/head_traj_controller/point_head_action", true);
-
-	// wait for the action server to come up
-	while (!headClient->waitForServer(ros::Duration(5.0)))
-		ROS_INFO("Waiting for the point_head_action server to come up");
-
-	ROS_INFO("Moving head");
-
-	// the target point, expressed in the given frame
-	geometry_msgs::PointStamped targetPoint;
-	targetPoint.header.frame_id = FRAME_BASE;
-	targetPoint.point.x = Config::get()["setup"]["headTarget"]["x"].as<float>(0.9);
-	targetPoint.point.y = Config::get()["setup"]["headTarget"]["y"].as<float>(0.0);
-	targetPoint.point.z = Config::get()["setup"]["headTarget"]["z"].as<float>(0.5);
-
-	// make the kinect x axis point at the desired position
-	control_msgs::PointHeadGoal goal;
-	goal.target = targetPoint;
-	goal.pointing_frame = "head_mount_kinect_rgb_link";
-	goal.pointing_axis.x = 1;
-	goal.pointing_axis.y = 0;
-	goal.pointing_axis.z = 0;
-
-	// displacement limits (at least 1 sec and no faster than 1 rad/s)
-	goal.min_duration = ros::Duration(1);
-	goal.max_velocity = 1.0;
-
-	ROS_INFO("...sending head goal");
-	headClient->sendGoal(goal);
-	headClient->waitForResult(ros::Duration(2));
+	RobotUtils::moveHead(Config::get()["setup"]["headTarget"]["x"].as<float>(0.9),
+						 Config::get()["setup"]["headTarget"]["y"].as<float>(0),
+						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5));
 
 	ROS_INFO("...head moved");
 }
@@ -316,7 +288,7 @@ int main(int argn_, char** argv_)
 
 
 	ROS_INFO("Starting setup service");
-	ros::AsyncSpinner spinner(2);
+	ros::AsyncSpinner spinner(3);
 	spinner.start();
 	ros::waitForShutdown();
 
