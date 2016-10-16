@@ -202,7 +202,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 		ROS_DEBUG("Clipping cloud");
 		pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
-		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(sampled, transformation, clippingPlaneZ_, clippingPlane);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::planeClipping(sampled, transformation, AXIS_Z, clippingPlaneZ_, 1, clippingPlane);
 
 		ROS_DEBUG("Cloud clipped");
 		if (filtered->empty())

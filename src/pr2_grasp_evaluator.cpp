@@ -26,7 +26,7 @@ tf::TransformListener *tfListener;
 std::vector<bool> status;
 
 /***** Debug variables *****/
-ros::Publisher cloudPublisher, planePublisher;
+ros::Publisher cloudPublisher, planeXPublisher, planeZPublisher;
 
 
 /**************************************************/
@@ -42,7 +42,8 @@ inline int countTrue(const std::vector<bool> &array_)
 
 /**************************************************/
 void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
-				   const float clippingPlaneZ_,
+				   const std::map<std::string, float> clippingX_,
+				   const std::map<std::string, float> clippingZ_,
 				   const bool debugEnabled_)
 {
 	if (evaluateCloud)
@@ -66,29 +67,44 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 		tf::StampedTransform transformation;
 		while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
 
-		ROS_DEBUG("...clipping cloud");
-		pcl::PointCloud<pcl::PointXYZ>::Ptr plane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
-		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::basicPlaneClippingZ(cloudXYZ, transformation, clippingPlaneZ_, plane);
+		ROS_DEBUG("...clipping cloud (x:%f -- z:%f)", clippingX_.find("p")->second, clippingZ_.find("p")->second);
+
+		// Clip along X
+		pcl::PointCloud<pcl::PointXYZ>::Ptr planeX = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
+		pcl::PointCloud<pcl::PointXYZ>::Ptr clipped1 = GraspingUtils::planeClipping(cloudXYZ, transformation, AXIS_X, clippingX_.find("p")->second, clippingX_.find("n")->second, planeX);
+
+		// Clip along Z
+		pcl::PointCloud<pcl::PointXYZ>::Ptr planeZ = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
+		pcl::PointCloud<pcl::PointXYZ>::Ptr clipped2 = GraspingUtils::planeClipping(clipped1, transformation, AXIS_Z,  clippingZ_.find("p")->second, clippingZ_.find("n")->second, planeZ);
+
 
 		// Publish debug data
 		if (debugEnabled_)
 		{
 			sensor_msgs::PointCloud2 cloudMsg;
-			pcl::toROSMsg<pcl::PointXYZ>(*filtered, cloudMsg);
+			pcl::toROSMsg<pcl::PointXYZ>(*clipped2, cloudMsg);
 			cloudMsg.header.stamp = ros::Time::now();
 			cloudMsg.header.frame_id = msg_->header.frame_id;
 			cloudPublisher.publish(cloudMsg);
 
-			sensor_msgs::PointCloud2 planeMsg;
-			pcl::toROSMsg<pcl::PointXYZ>(*plane, planeMsg);
-			planeMsg.header.stamp = ros::Time::now();
-			planeMsg.header.frame_id = msg_->header.frame_id;
-			planePublisher.publish(planeMsg);
+			sensor_msgs::PointCloud2 planeXMsg;
+			pcl::toROSMsg<pcl::PointXYZ>(*planeX, planeXMsg);
+			planeXMsg.header.stamp = ros::Time::now();
+			planeXMsg.header.frame_id = msg_->header.frame_id;
+			planeXPublisher.publish(planeXMsg);
+
+			sensor_msgs::PointCloud2 planeZMsg;
+			pcl::toROSMsg<pcl::PointXYZ>(*planeZ, planeZMsg);
+			planeZMsg.header.stamp = ros::Time::now();
+			planeZMsg.header.frame_id = msg_->header.frame_id;
+			planeZPublisher.publish(planeZMsg);
 		}
 
+
+		/***** STAGE 3: check the results *****/
 		// Check if there's any point after clipping
-		graspState.push_back(!filtered->empty());
-		ROS_INFO("...filtered cloud size: %zu pts", filtered->size());
+		graspState.push_back(!clipped2->empty());
+		ROS_INFO("...clipped cloud size: %zu pts", clipped2->size());
 
 		// If some clouds have been evaluated, then set the result
 		if (graspState.size() == CLOUDS_FOR_EVALUATION)
@@ -111,17 +127,28 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 /**************************************************/
 bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 					  pr2_grasping::GraspEvaluator::Response &response_,
-					  const float x_,
-					  const float y_,
-					  const float z_,
 					  const int successThreshold_,
-					  const int maxRetries_)
+					  const int maxRetries_,
+					  const std::map<std::string, float> &object_,
+					  const std::map<std::string, float> &head_)
 {
+	// Prevent excessive logging from the action client library
+	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
+		ros::console::notifyLoggerLevelsChanged();
+
 	// Clear the status vector to begin a new evaluation
 	mutex.lock();
 	status.clear();
 	mutex.unlock();
 
+
+	/***** STAGE 1: prepare the robot *****/
+	// Point the head to the evaluation pose
+	RobotUtils::moveHead(head_.find("x")->second, head_.find("y")->second, head_.find("z")->second);
+	ros::Duration(0.5).sleep();
+
+
+	/***** STAGE 2: evaluate different object's positions *****/
 	// Prepare the planning framework
 	moveit::planning_interface::MoveGroup::Plan plan;
 	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(request_.effectorName);
@@ -129,14 +156,22 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 
+
+	// Stop any previous movement
+	effector->stop();
+	ros::Duration(0.5).sleep();
+
+
 	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, 1));
 	Eigen::Quaternionf incremental = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(0, 1, 0), Eigen::Vector3f(0, 0, -1));
 
+
 	geometry_msgs::PoseStamped evalPose;
 	evalPose.header.frame_id = FRAME_BASE;
-	evalPose.pose.position.x = x_;
-	evalPose.pose.position.y = y_;
-	evalPose.pose.position.z = z_;
+	evalPose.pose.position.x = object_.find("x")->second;
+	evalPose.pose.position.y = object_.find("y")->second;;
+	evalPose.pose.position.z = object_.find("z")->second;;
+
 
 	// Iterate testing a set of poses to evaluate the grasping result
 	while (status.size() < 4)
@@ -206,19 +241,21 @@ int main(int argn_, char** argv_)
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
+
 	bool debugEnabled = Config::get()["evaluatorDebug"].as<bool>();
-	float clippingPlaneZ = Config::get()["evaluator"]["clippingPlaneZ"].as<float>();
+	std::map<std::string, float> clippingX = Config::get()["evaluator"]["clippingX"].as<std::map<std::string, float> >();
+	std::map<std::string, float> clippingZ = Config::get()["evaluator"]["clippingZ"].as<std::map<std::string, float> >();
 	int successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
 	int maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
-	float x = Config::get()["evaluator"]["position"]["x"].as<float>();
-	float y = Config::get()["evaluator"]["position"]["y"].as<float>();
-	float z = Config::get()["evaluator"]["position"]["z"].as<float>();
+	std::map<std::string, float> object = Config::get()["evaluator"]["position"].as<std::map<std::string, float> >();
+	std::map<std::string, float> head = Config::get()["evaluator"]["head"].as<std::map<std::string, float> >();
+
 
 	// Set subscription
-	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>("/move_group/filtered_cloud", 1, boost::bind(cloudCallback, _1, clippingPlaneZ, debugEnabled));
+	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>("/move_group/filtered_cloud", 1, boost::bind(cloudCallback, _1, clippingX, clippingZ, debugEnabled));
 
 	// Set service
-	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, x, y, z, successThreshold, maxRetries));
+	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head));
 
 	// Set debug behavior
 	if (debugEnabled)
@@ -226,8 +263,9 @@ int main(int argn_, char** argv_)
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
-		cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_cloud", 1);
-		planePublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane", 1);
+		cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_cloud", 1, true);
+		planeXPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_x", 1, true);
+		planeZPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_z", 1, true);
 	}
 
 	// Start the service
