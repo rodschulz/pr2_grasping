@@ -165,8 +165,31 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 /**************************************************/
 void releaseObject(MoveGroupPtr &effector_)
 {
-	// if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
-	// ros::console::notifyLoggerLevelsChanged();
+	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info))
+		ros::console::notifyLoggerLevelsChanged();
+
+	// Stop any previous movement
+	effector_->stop();
+
+
+	// Move the effector to an adequate pose to release the object
+	ROS_INFO(".....moving effector to release pose");
+	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 1, 0));
+	geometry_msgs::PoseStamped current;
+	current.header.frame_id = FRAME_BASE;
+	current.pose.position.x = 0.4;
+	current.pose.position.y = -0.4;
+	current.pose.position.z = 0.9;
+	current.pose.orientation.w = rotation.w();
+	current.pose.orientation.x = rotation.x();
+	current.pose.orientation.y = rotation.y();
+	current.pose.orientation.z = rotation.z();
+	effector_->setPoseTarget(current);
+
+	if (!RobotUtils::move(effector_, current, 25))
+		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
+
+
 
 	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
 	while (!client->waitForServer(ros::Duration(5.0)))
