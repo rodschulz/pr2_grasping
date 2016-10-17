@@ -249,10 +249,11 @@ int main(int argn_, char** argv_)
 	int maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
 	std::map<std::string, float> object = Config::get()["evaluator"]["position"].as<std::map<std::string, float> >();
 	std::map<std::string, float> head = Config::get()["evaluator"]["head"].as<std::map<std::string, float> >();
+	std::string topicName = Config::get()["evaluator"]["pointcloudTopic"].as<std::string>();
 
 
 	// Set subscription
-	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>("/move_group/filtered_cloud", 1, boost::bind(cloudCallback, _1, clippingX, clippingZ, debugEnabled));
+	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, clippingX, clippingZ, debugEnabled));
 
 	// Set service
 	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head));

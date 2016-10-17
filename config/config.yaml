@@ -30,7 +30,7 @@ setup:
 
 ##### labeler node options #####
 labeler:
-    # point cloud input topic
+    # point cloud input topic (/head_mount_kinect/depth/points or /move_group/filtered_cloud)
     pointcloudTopic: /head_mount_kinect/depth/points
     # sampling voxel size
     voxelSize: 0.004
@@ -67,7 +67,7 @@ grasper:
 ##### evaluator node options #####
 evaluator:
     # positions to clip the cloud in planes X and Z (position and normal orientation)
-    clippingZ: {p: 0.7, n: 1}
+    clippingZ: {p: 0.8, n: 1}
     clippingX: {p: 0.6, n: -1}
     # minimum number of positive poses o decide that a grasp was successful (1 to 4)
     successThreshold: 1
@@ -77,6 +77,8 @@ evaluator:
     position: {x: 0.45, y: 0, z: 0.7}
     # hear target for evaluation of grasping attempt (relative to 'base_footprint')
     head: {x: 0.9, y: 0.0, z: 0.5}
+    # point cloud input topic (/head_mount_kinect/depth/points or /move_group/filtered_cloud)
+    pointcloudTopic: /move_group/filtered_cloud 
 
 ########## descriptor params ##########
 

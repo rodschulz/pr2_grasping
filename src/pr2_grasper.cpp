@@ -173,7 +173,7 @@ void releaseObject(MoveGroupPtr &effector_)
 
 	// Move the effector to an adequate pose to release the object
 	ROS_INFO(".....moving effector to release pose");
-	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 1, 0));
+	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, -1));
 	geometry_msgs::PoseStamped current;
 	current.header.frame_id = FRAME_BASE;
 	current.pose.position.x = 0.4;
@@ -311,34 +311,44 @@ void timerCallback(const ros::TimerEvent &event_,
 			ROS_INFO("...attempting grasp");
 			std::vector<moveit_msgs::Grasp> grasps;
 			grasps.push_back(grasp);
-			moveit::planning_interface::MoveItErrorCode errCode = effector_->pick(TARGET_OBJECT, grasps);
-			ROS_INFO("...attempt finished (code: %d)", errCode.val);
 
-
-			// Skip the rest if the planning failed
-			if (errCode == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
-					errCode == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
+			int counter = 0;
+			moveit::planning_interface::MoveItErrorCode errCode;
+			while ((errCode.val == 0 ||
+					errCode.val == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
+					errCode.val == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN) &&
+					counter++ < 10)
 			{
-				ROS_INFO("...planning attempt failed, skipping");
-				ros::Duration(0.5).sleep();// little wait to be able to read the message
+				errCode = effector_->pick(TARGET_OBJECT, grasps);
+				ROS_INFO("...attempt finished (code: %d)", errCode.val);
 			}
 
 
-			/********** STAGE 2.5: check the grasping attempt result **********/
-			ROS_INFO("...evaluating result");
-			pr2_grasping::GraspEvaluator eval;
-			eval.request.effectorName = effector_->getName();
-			if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
-				ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
-			ros::Duration(0.5).sleep();
+			// Skip the rest if the planning failed
+			if (errCode.val != moveit_msgs::MoveItErrorCodes::PLANNING_FAILED &&
+					errCode.val != moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
+			{
+				/********** STAGE 2.5: check the grasping attempt result **********/
+				ROS_INFO("...evaluating result");
+				pr2_grasping::GraspEvaluator eval;
+				eval.request.effectorName = effector_->getName();
+				if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
+					ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
+				ros::Duration(0.5).sleep();
 
 
-			/********** STAGE 2.6: release the object **********/
-			/** This MUST be done before restoring the setup, otherwise the
-			robot gets moved when the object's position is reseted **/
-			ROS_INFO("...releasing object");
-			releaseObject(effector_);
-			ros::Duration(0.5).sleep();
+				/********** STAGE 2.6: release the object **********/
+				/** This MUST be done before restoring the setup, otherwise the
+				robot gets moved when the object's position is reseted **/
+				ROS_INFO("...releasing object");
+				releaseObject(effector_);
+				ros::Duration(0.5).sleep();
+			}
+			else
+			{
+				ROS_INFO("...planning attempt failed, skipping evaluation");
+				ros::Duration(0.5).sleep();// little wait to be able to read the message
+			}
 
 
 			/********** STAGE 2.7: remove collision objects **********/

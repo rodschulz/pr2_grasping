@@ -131,7 +131,10 @@ public:
 				return false;
 			}
 
-			ROS_INFO(".....planning failed, retrying");
+			if (maxRetries_ == -1)
+				ROS_INFO(".....planning failed, retrying (no limit of attempts)");
+			else
+				ROS_INFO(".....planning failed, retrying (%d out of %d attempts)", retries, maxRetries_);
 			ros::Duration(0.5).sleep();
 		}
 
