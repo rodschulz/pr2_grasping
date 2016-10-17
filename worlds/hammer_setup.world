@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://hammer</uri>
 			<name>hammer</name>
-			<pose>0.75 0 0.643752 -0.013702 0.015680 0.000285</pose>
+			<pose>0.715 0.07 0.48 -0.015544 0.027142 0.000285</pose>
 		</include>
 
 		<!-- Shadows disabled -->

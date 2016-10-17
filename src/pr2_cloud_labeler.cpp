@@ -121,17 +121,18 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 
 		if (lastLabel != label)
 		{
+			if (debug_)
+				ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
+
 			lastLabel = label;
 			lastLabelIndex = i;
 			nlabels++;
-
-			if (debug_)
-				ROS_INFO(".....label %d, %zu pts", lastLabel, i - lastLabelIndex);
 		}
 	}
 	if (debug_)
 		ROS_INFO(".....label %d, %zu pts", lastLabel, cloud_->size() - lastLabelIndex);
 
+	nlabels = lastLabel != label ? nlabels + 1 : nlabels;
 	ROS_INFO(".....%d labels found", nlabels);
 
 	return labeledCloud;
