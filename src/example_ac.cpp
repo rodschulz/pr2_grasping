@@ -3,10 +3,6 @@
  * 2016
  */
 #include <ros/ros.h>
-#include <actionlib/client/simple_action_client.h>
-#include <control_msgs/PointHeadAction.h>
-#include <moveit_msgs/PickupAction.h>
-#include <moveit/move_group_interface/move_group.h>
 #include <moveit/move_group_pick_place_capability/capability_names.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <shape_tools/solid_primitive_dims.h>
@@ -16,9 +12,6 @@
 
 #define TARGET_ID	"target"
 #define SUPPORT_ID	"support"
-
-typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
-typedef actionlib::SimpleActionClient<moveit_msgs::PickupAction> PickupClient;
 
 
 /**************************************************/

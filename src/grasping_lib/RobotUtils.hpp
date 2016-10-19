@@ -12,6 +12,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <control_msgs/SingleJointPositionAction.h>
 #include <control_msgs/PointHeadAction.h>
+#include <moveit_msgs/PickupAction.h>
 #include <control_msgs/GripperCommandAction.h>
 
 enum Effector
@@ -24,11 +25,13 @@ enum Effector
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_footprint"
 
-
+/***** Move group pointer *****/
 typedef boost::shared_ptr<moveit::planning_interface::MoveGroup> MoveGroupPtr;
+
 /***** Client types definitions *****/
 typedef actionlib::SimpleActionClient<control_msgs::SingleJointPositionAction> TorsoClient;
 typedef actionlib::SimpleActionClient<control_msgs::PointHeadAction> HeadClient;
+typedef actionlib::SimpleActionClient<moveit_msgs::PickupAction> PickupClient;
 typedef actionlib::SimpleActionClient<control_msgs::GripperCommandAction> GripperClient;
 
 
@@ -169,15 +172,9 @@ public:
 		goal.pointing_axis.y = 0;
 		goal.pointing_axis.z = 0;
 
-		// displacement limits (at least 1 sec and no faster than 1 rad/s)
-		// goal.min_duration = ros::Duration(1);
-		// goal.max_velocity = 1.0;
-
 		ROS_INFO("...sending head goal");
 		headClient->sendGoal(goal);
 		headClient->waitForResult(ros::Duration(60));
-
-		// ROS_INFO("...head moved");
 	}
 
 private:

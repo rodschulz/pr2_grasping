@@ -61,30 +61,30 @@ ros::Publisher limitsPublisher, planePublisher;
 
 
 /**************************************************/
-float getEffectorAngle(const cv::Mat &bow_,
-		const int bandNumber_,
-		const int binNumber_,
-		const bool bidirectional_)
-{
-	if (!bidirectional_)
-	{
-		float maxAngle = -1;
-		int targetBand = 0;
-		cv::Mat row = bow.row<float>(label);
-		for(int band = 0; band < bandNumber_; band++)
-		{
-			float meanAngle = cv::mean(row.colRange(band * binNumber_, (band + 1)* binNumber_)).val[0];
-			if (meanAngle > maxAngle)
-			{
-				maxAngle = meanAngle;
-				targetBand = band;
-			}
-		}
-	}
-	else
-	{
-	}
-}
+// float getEffectorAngle(const cv::Mat &bow_,
+// 		const int bandNumber_,
+// 		const int binNumber_,
+// 		const bool bidirectional_)
+// {
+// 	if (!bidirectional_)
+// 	{
+// 		float maxAngle = -1;
+// 		int targetBand = 0;
+// 		cv::Mat row = bow.row<float>(label);
+// 		for(int band = 0; band < bandNumber_; band++)
+// 		{
+// 			float meanAngle = cv::mean(row.colRange(band * binNumber_, (band + 1)* binNumber_)).val[0];
+// 			if (meanAngle > maxAngle)
+// 			{
+// 				maxAngle = meanAngle;
+// 				targetBand = band;
+// 			}
+// 		}
+// 	}
+// 	else
+// 	{
+// 	}
+// }
 
 
 /**************************************************/
@@ -118,9 +118,6 @@ std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingB
 /**************************************************/
 pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
 		const cv::Mat &labels_,
-		const cv::Mat &bow_,
-		const int bandNumber_,
-		const int binNumber_,
 		const bool debug_ = false)
 {
 	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = pcl::PointCloud<PointXYZNL>::Ptr(new pcl::PointCloud<PointXYZNL>());
@@ -130,28 +127,13 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 	cv::sortIdx(labels_, indices, cv::SORT_EVERY_COLUMN + cv::SORT_ASCENDING);
 
 	// Generate the output cloud
-	int nlabels = 0;
+	int nlabels = 1;
 	int lastLabel = labels_.at<float>(indices.at<int>(0));
 	int lastLabelIndex = 0;
 	for (size_t i = 0; i < cloud_->size(); i++)
 	{
 		int index = indices.at<int>(i);
 		int label = labels_.at<float>(index);
-
-
-		float maxAngle = -1;
-		int targetBand = 0;
-		cv::Mat row = bow.row<float>(label);
-		for(int band = 0; band < bandNumber_; band++)
-		{
-			float meanAngle = cv::mean(row.colRange(band * binNumber_, (band + 1)* binNumber_)).val[0];
-			if (meanAngle > maxAngle)
-			{
-				maxAngle = meanAngle;
-				targetBand = band;
-			}
-		}
-
 
 		pcl::PointNormal p = cloud_->at(index);
 		PointXYZNL newPoint;
@@ -177,7 +159,6 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 	if (debug_)
 		ROS_INFO(".....label %d, %zu pts", lastLabel, cloud_->size() - lastLabelIndex);
 
-	nlabels = lastLabel != label ? nlabels + 1 : nlabels;
 	ROS_INFO(".....%d labels found", nlabels);
 
 	return labeledCloud;
