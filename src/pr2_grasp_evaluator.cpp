@@ -150,14 +150,6 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 
 	/***** STAGE 2: evaluate different object's positions *****/
-	// Prepare the planning framework
-	// moveit::planning_interface::MoveGroup::Plan plan;
-	// std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(request_.effectorName);
-	// MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
-	// effector->setEndEffector(effectorNames.second);
-	// effector->setPlannerId("RRTConnectkConfigDefault");
-
-
 	// Stop any previous movement
 	effector_->stop();
 	ros::Duration(0.5).sleep();
@@ -275,6 +267,7 @@ int main(int argn_, char** argv_)
 			ROS_INFO("Queried grasping group %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 		ros::Duration(1).sleep();
 	}
+	ROS_INFO("Using grasping group %s", srv.response.groupName.c_str());
 
 
 	/********** Prepare the planning/moving interfaces **********/

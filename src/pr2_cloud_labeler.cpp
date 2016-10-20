@@ -349,20 +349,20 @@ int main(int argn_, char **argv_)
 	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
-	// Load the node's configuration
+
+	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
-
-	// Retrieve execution params
 	bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
 	float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
 	float clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
 	bool writeClouds = Config::get()["labeler"]["writeClouds"].as<bool>();
+	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
 
 
-	// Load the BoW definition and prepare the classificator
+	/********** Load the BoW definition and prepare the classificator **********/
 	ROS_INFO("Training labeling classifier");
 	cv::Mat BoW;
 	std::map<std::string, std::string> metadata;
@@ -370,24 +370,11 @@ int main(int argn_, char **argv_)
 	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
 
 
-	// Begin spinner
-	ros::AsyncSpinner spinner(2);
-	spinner.start();
-
-
-	// Set publishers
+	/********** Set subscriptions/publishers **********/
 	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
 	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
-
-	// Set subscriptions
-	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
 	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
 
-	// Set services
-	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
-
-
-	// Set debug behavior
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
@@ -398,9 +385,14 @@ int main(int argn_, char **argv_)
 	}
 
 
-	// Keep looping
-	ROS_INFO("Labeler node looping");
-	// ros::spin();
+	/********** Set services **********/
+	ROS_INFO("Starting labeler service");
+	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
+
+
+	/********** Spin the node **********/
+	ros::AsyncSpinner spinner(2);
+	spinner.start();
 	ros::waitForShutdown();
 
 	return EXIT_SUCCESS;

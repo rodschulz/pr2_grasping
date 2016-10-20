@@ -329,10 +329,9 @@ void timerCallback(const ros::TimerEvent &event_,
 			{
 				/********** STAGE 2.5: check the grasping attempt result **********/
 				ROS_INFO("...evaluating result");
-				pr2_grasping::GraspEvaluator eval;
-				eval.request.effectorName = effector_->getName();
-				if (ros::service::call("/pr2_grasping/grasp_evaluator", eval))
-					ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
+				pr2_grasping::GraspEvaluator srv;
+				if (ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 				ros::Duration(0.5).sleep();
 
 
@@ -454,7 +453,7 @@ int main(int _argn, char **_argv)
 	}
 
 
-	/********** Set service **********/
+	/********** Set services **********/
 	ROS_INFO("Starting name query service");
 	ros::ServiceServer nameService = handler.advertiseService<pr2_grasping::GraspingGroup::Request, pr2_grasping::GraspingGroup::Response>("/pr2_grasping/effector_name", boost::bind(queryName, _1, _2, effector));
 

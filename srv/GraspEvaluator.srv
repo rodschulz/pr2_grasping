@@ -1,5 +1,3 @@
-# Name of the effector grasping an object, which is desired to be evaluated
-string effectorName
 ---
 # Indicates if the grasping was successful (true) or not (false)
 bool result
