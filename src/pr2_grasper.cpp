@@ -6,9 +6,10 @@
 #include <tf/transform_listener.h>
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
+#include <pr2_grasping/CloudLabeler.h>
 #include <pr2_grasping/GazeboSetup.h>
 #include <pr2_grasping/GraspEvaluator.h>
-#include <pr2_grasping/CloudLabeler.h>
+#include <pr2_grasping/GraspingGroup.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -391,18 +392,25 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 /**************************************************/
+bool queryName(pr2_grasping::GraspingGroup::Request  &request_,
+			   pr2_grasping::GraspingGroup::Response &response_)
+{
+	return true;
+}
+
+/**************************************************/
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
 	ros::NodeHandle handler;
 	tf::TransformListener *tfListener = new tf::TransformListener(ros::Duration(10.0));
+	moveit::planning_interface::PlanningSceneInterface planningScene;
 
 
-	// Load the node's configuration
+	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
-
 
 	// Get the max allowed size for the message queue
 	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
@@ -411,7 +419,7 @@ int main(int _argn, char **_argv)
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
 
-	// Call the setup service to prepare the robot and environment
+	/********** Setup the robot and environment **********/
 	ROS_INFO("Calling setup service");
 	pr2_grasping::GazeboSetup srv;
 	srv.request.resetObject = true;
@@ -420,11 +428,7 @@ int main(int _argn, char **_argv)
 	ros::Duration(0.5).sleep();
 
 
-	// This MUST be declared before planning, otherwise collisions won't work (WTF)
-	moveit::planning_interface::PlanningSceneInterface planningScene;
-
-
-	// Group to plane movement for both arms
+	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
 	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(Config::get()["grasper"]["arm"].as<std::string>());
 	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
@@ -434,13 +438,12 @@ int main(int _argn, char **_argv)
 	effector->setNumPlanningAttempts(5);
 
 
-	// Set subscriptions
+	/********** Set subscriptions **********/
 	ROS_INFO("Setting publishers/subscribers");
 	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
 	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
-	// Set debug stuff
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
@@ -451,7 +454,11 @@ int main(int _argn, char **_argv)
 	}
 
 
-	// Asynchronous spinning
+	/********** Set effector's name publishing service **********/
+	ros::ServiceServer nameService = handler.advertiseService("/pr2_grasping/effector_name", queryName);
+
+
+	/********** Spin the node **********/
 	ros::AsyncSpinner spinner(3);
 	spinner.start();
 	ros::waitForShutdown();
