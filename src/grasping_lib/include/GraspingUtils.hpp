@@ -35,13 +35,7 @@ class GraspingUtils
 {
 public:
 	/**************************************************/
-	static std::string getConfigPath()
-	{
-		std::string packagePath = ros::package::getPath(PACKAGE_NAME);
-		std::string fullpath = packagePath + "/" + CONFIG_LOCATION;
-		return fullpath;
-	}
-
+	static std::string getConfigPath();
 
 	/**************************************************/
 	static bool getTransformation(tf::StampedTransform &transform_,
@@ -49,39 +43,13 @@ public:
 								  const std::string &target_,
 								  const std::string &source_,
 								  const ros::Time &time_ = ros::Time::now(),
-								  const ros::Duration &timeout_ = ros::Duration(1.0))
-	{
-		try
-		{
-			tfListener_->waitForTransform(target_, source_, time_, timeout_);
-			tfListener_->lookupTransform(target_, source_, ros::Time(0), transform_);
-			return true;
-		}
-		catch (tf::TransformException &ex)
-		{
-			ROS_ERROR("%s", ex.what());
-			return false;
-		}
-	}
-
+								  const ros::Duration &timeout_ = ros::Duration(1.0));
 
 	/**************************************************/
 	static geometry_msgs::Point transformPoint(const tf::TransformListener *tfListener_,
 			const std::string &target_,
 			const std::string &source_,
-			const geometry_msgs::Point &point_)
-	{
-		tf::StampedTransform toTarget;
-		while (!GraspingUtils::getTransformation(toTarget, tfListener_, target_, source_));
-		tf::Vector3 conv = toTarget * tf::Vector3(point_.x, point_.y, point_.z);
-
-		geometry_msgs::Point result;
-		result.x = conv.x();
-		result.y = conv.y();
-		result.z = conv.z();
-		return result;
-	}
-
+			const geometry_msgs::Point &point_);
 
 	/**************************************************/
 	static pcl::PointCloud<pcl::PointXYZ>::Ptr planeClipping(pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
@@ -89,90 +57,12 @@ public:
 			const ClippingAxis axis_,
 			const float position_,
 			const float normalOrientation_,
-			pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr())
-	{
-		// Just to be sure the orientation factor is normalized
-		float orientation = normalOrientation_ / fabs(normalOrientation_);
-
-		// Prepare the clipping position and plane's normal
-		tf::Vector3 tfPoint, tfNormal;
-		switch (axis_)
-		{
-		default:
-		case AXIS_X:
-			tfPoint = transformation * tf::Vector3(position_, 0, 0);
-			tfNormal = transformation.getBasis().getColumn(0) * orientation;
-			break;
-
-		case AXIS_Y:
-			tfPoint = transformation * tf::Vector3(0, position_, 0);
-			tfNormal = transformation.getBasis().getColumn(1) * orientation;
-			break;
-
-		case AXIS_Z:
-			tfPoint = transformation * tf::Vector3(0, 0, position_);
-			tfNormal = transformation.getBasis().getColumn(2) * orientation;
-			break;
-		}
-
-		Eigen::Vector3f point = Eigen::Vector3f(tfPoint.x(), tfPoint.y(), tfPoint.z());
-		Eigen::Vector3f normal = Eigen::Vector3f(tfNormal.x(), tfNormal.y(), tfNormal.z());
-
-		Eigen::Hyperplane<float, 3> clippingPlane = Eigen::Hyperplane<float, 3>(normal, point);
-		Eigen::Hyperplane<float, 3>::Coefficients planeCoeffs = clippingPlane.coeffs();
-
-		// Get the filtered point indices
-		std::vector<int> clippedPoints, idxs;
-		pcl::PlaneClipper3D<pcl::PointXYZ> filter = pcl::PlaneClipper3D<pcl::PointXYZ>(planeCoeffs);
-		filter.clipPointCloud3D(*cloud_, clippedPoints, idxs);
-
-		// Generate the filtered cloud
-		pcl::PointCloud<pcl::PointXYZ>::Ptr filteredCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-		for (size_t i = 0; i < clippedPoints.size(); i++)
-			filteredCloud->push_back(cloud_->at(clippedPoints[i]));
-
-		// Generate a sample of the clipping plane output cloud if required
-		if (planeCloud_.get() != NULL)
-		{
-			planeCloud_->clear();
-			for (float i = -2; i <= 2; i += 0.05)
-				for (float j = -2; j <= 2; j += 0.05)
-				{
-					Eigen::Vector3f p;
-					switch (axis_)
-					{
-					default:
-					case AXIS_X:
-						p = Eigen::Vector3f(i, 0, j);
-						break;
-
-					case AXIS_Y:
-						p = Eigen::Vector3f(0, i, j);
-						break;
-
-					case AXIS_Z:
-						p = Eigen::Vector3f(i, j, 0);
-						break;
-					}
-					planeCloud_->push_back(PointFactory::createPointXYZ(clippingPlane.projection(p)));
-				}
-		}
-
-		return filteredCloud;
-	}
-
+			pcl::PointCloud<pcl::PointXYZ>::Ptr planeCloud_ = pcl::PointCloud<pcl::PointXYZ>::Ptr());
 
 	/**************************************************/
 	static void downsampleCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud_,
 								const float voxelSize_,
-								pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_)
-	{
-		pcl::VoxelGrid<pcl::PointXYZ> grid;
-		grid.setInputCloud(cloud_);
-		grid.setLeafSize(voxelSize_, voxelSize_, voxelSize_);
-		grid.filter(*sampledCloud_);
-	}
-
+								pcl::PointCloud<pcl::PointXYZ>::Ptr &sampledCloud_);
 
 	/**************************************************/
 	static geometry_msgs::Pose genPose(const float x_,
@@ -181,22 +71,15 @@ public:
 									   const float theta_ = 0,
 									   const float dirx_ = 1,
 									   const float diry_ = 0,
-									   const float dirz_ = 0)
+									   const float dirz_ = 0);
+
+	/**************************************************/
+	template <typename T>
+	static bool callService(const std::string serviceName_, T &srv_, const int retries_ = -1)
 	{
-		geometry_msgs::Pose pose;
-
-		pose.position.x = x_;
-		pose.position.y = y_;
-		pose.position.z = z_;
-
-		Eigen::Vector3f p = Eigen::Vector3f(dirx_, diry_, dirz_).normalized();
-		pose.orientation.w = cos(theta_ / 2);
-		pose.orientation.x = p.x() * sin(theta_ / 2);
-		pose.orientation.y = p.y() * sin(theta_ / 2);
-		pose.orientation.z = p.z() * sin(theta_ / 2);
-
-		return pose;
+		return true;
 	}
+
 
 private:
 	// Constructor

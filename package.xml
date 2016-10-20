@@ -5,14 +5,15 @@
     <description>Package performing descriptor based grasping</description>
     
     <!-- package metadata -->
-    <maintainer email="rodrigo@fakemail.com">rodrigo</maintainer>
+    <maintainer email="rodrigo@fakemail.com">Rodrigo Schulz</maintainer>
     <license>GPLv3</license>
     <url type="website">https://github.com/rodschulz/pr2_grasping</url>
-    <author email="rodrigo@fakemail.com">rodrigo</author>
+    <author email="rodrigo@fakemail.com">Rodrigo Schulz</author>
     
     <!-- package build dependencies -->
     <buildtool_depend>catkin</buildtool_depend>
     <build_depend>message_generation</build_depend>
+    <build_depend>roslib</build_depend>
     <build_depend>roscpp</build_depend>
     <build_depend>rospy</build_depend>
     <build_depend>std_msgs</build_depend>
@@ -28,6 +29,7 @@
     <!-- package run dependencies -->
     <run_depend>message_generation</run_depend>
     <run_depend>message_runtime</run_depend>
+    <run_depend>roslib</run_depend>
     <run_depend>roscpp</run_depend>
     <run_depend>rospy</run_depend>
     <run_depend>std_msgs</run_depend>

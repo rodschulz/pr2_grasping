@@ -23,6 +23,7 @@ endif()
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
 	message_generation
+	roslib
 	roscpp
 	rospy
 	actionlib
@@ -70,6 +71,7 @@ add_service_files(
 		CloudLabeler.srv
 		GazeboSetup.srv
 		GraspEvaluator.srv
+		GraspingGroup.srv
 )
 
 # Generate the custom messages
@@ -103,6 +105,7 @@ add_definitions("-Wall")
 catkin_package(
 	CATKIN_DEPENDS
 		message_runtime
+		roslib
 		roscpp
 		rospy
 		actionlib
@@ -134,7 +137,9 @@ foreach(subdir ${lib_directories})
 	endif()
 endforeach()
 
-include_directories(src/grasping_lib/)
+# Add the directory of the descriptor's libraries
+add_subdirectory(src/grasping_lib)
+include_directories(src/grasping_lib/include)
 
 ## Specify additional locations of header files
 include_directories(${catkin_INCLUDE_DIRS})
@@ -159,6 +164,7 @@ set(APPS_LINKING_DEPENDENCIES
 	factories
 	io
 	utils
+	grasping
 	${PCL_LIBRARIES}
 	${YAML_CPP_LIBRARIES}
 	${OpenCV_LIBS}
