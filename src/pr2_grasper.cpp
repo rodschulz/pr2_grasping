@@ -189,8 +189,6 @@ void releaseObject(MoveGroupPtr &effector_)
 	if (!RobotUtils::move(effector_, current, 25))
 		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
 
-
-
 	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
 	while (!client->waitForServer(ros::Duration(5.0)))
 		ROS_INFO("Waiting gripper action server to come online");
@@ -393,8 +391,19 @@ void timerCallback(const ros::TimerEvent &event_,
 
 /**************************************************/
 bool queryName(pr2_grasping::GraspingGroup::Request  &request_,
-			   pr2_grasping::GraspingGroup::Response &response_)
+			   pr2_grasping::GraspingGroup::Response &response_,
+			   const MoveGroupPtr effector_)
 {
+	if (effector_.get() != NULL)
+	{
+		response_.groupName = effector_->getName();
+		response_.result = true;
+	}
+	else
+	{
+		response_.groupName = "";
+		response_.result = false;
+	}
 	return true;
 }
 
@@ -419,15 +428,6 @@ int main(int _argn, char **_argv)
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
 
-	/********** Setup the robot and environment **********/
-	ROS_INFO("Calling setup service");
-	pr2_grasping::GazeboSetup srv;
-	srv.request.resetObject = true;
-	if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
-		ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED");
-	ros::Duration(0.5).sleep();
-
-
 	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
 	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(Config::get()["grasper"]["arm"].as<std::string>());
@@ -438,7 +438,7 @@ int main(int _argn, char **_argv)
 	effector->setNumPlanningAttempts(5);
 
 
-	/********** Set subscriptions **********/
+	/********** Set subscriptions/publishers **********/
 	ROS_INFO("Setting publishers/subscribers");
 	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
 	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
@@ -454,8 +454,18 @@ int main(int _argn, char **_argv)
 	}
 
 
-	/********** Set effector's name publishing service **********/
-	ros::ServiceServer nameService = handler.advertiseService("/pr2_grasping/effector_name", queryName);
+	/********** Set service **********/
+	ROS_INFO("Starting name query service");
+	ros::ServiceServer nameService = handler.advertiseService<pr2_grasping::GraspingGroup::Request, pr2_grasping::GraspingGroup::Response>("/pr2_grasping/effector_name", boost::bind(queryName, _1, _2, effector));
+
+
+	/********** Setup the robot and environment **********/
+	ROS_INFO("Calling setup service");
+	pr2_grasping::GazeboSetup srv;
+	srv.request.resetObject = true;
+	if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
+		ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED");
+	ros::Duration(0.5).sleep();
 
 
 	/********** Spin the node **********/

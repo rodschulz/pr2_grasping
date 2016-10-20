@@ -66,14 +66,6 @@ public:
 									   const float diry_ = 0,
 									   const float dirz_ = 0);
 
-	/**************************************************/
-	template <typename T>
-	static bool callService(const std::string serviceName_, T &srv_, const int retries_ = -1)
-	{
-		return true;
-	}
-
-
 private:
 	// Constructor
 	GraspingUtils();

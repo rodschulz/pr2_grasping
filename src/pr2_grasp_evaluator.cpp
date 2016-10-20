@@ -7,6 +7,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pr2_grasping/GraspEvaluator.h>
+#include <pr2_grasping/GraspingGroup.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <pcl/point_types.h>
@@ -17,7 +18,6 @@
 
 
 #define CLOUDS_FOR_EVALUATION	3
-
 
 /***** Global variables *****/
 boost::mutex mutex;
@@ -130,7 +130,8 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 					  const int successThreshold_,
 					  const int maxRetries_,
 					  const std::map<std::string, float> &object_,
-					  const std::map<std::string, float> &head_)
+					  const std::map<std::string, float> &head_,
+					  MoveGroupPtr effector_)
 {
 	// Prevent excessive logging from the action client library
 	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
@@ -150,15 +151,15 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 	/***** STAGE 2: evaluate different object's positions *****/
 	// Prepare the planning framework
-	moveit::planning_interface::MoveGroup::Plan plan;
-	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(request_.effectorName);
-	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
-	effector->setEndEffector(effectorNames.second);
-	effector->setPlannerId("RRTConnectkConfigDefault");
+	// moveit::planning_interface::MoveGroup::Plan plan;
+	// std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(request_.effectorName);
+	// MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
+	// effector->setEndEffector(effectorNames.second);
+	// effector->setPlannerId("RRTConnectkConfigDefault");
 
 
 	// Stop any previous movement
-	effector->stop();
+	effector_->stop();
 	ros::Duration(0.5).sleep();
 
 
@@ -180,7 +181,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		evalPose.pose.orientation.x = rotation.x();
 		evalPose.pose.orientation.y = rotation.y();
 		evalPose.pose.orientation.z = rotation.z();
-		effector->setPoseTarget(evalPose);
+		effector_->setPoseTarget(evalPose);
 
 		ROS_DEBUG_STREAM("*** Moving gripper to pose " << status.size());
 		ROS_DEBUG("f:%s - p:(%.3f, %.3f, %.3f) - o:(%.3f, %.3f, %.3f, %.3f)",
@@ -193,7 +194,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 				  evalPose.pose.orientation.z,
 				  evalPose.pose.orientation.w);
 
-		if (!RobotUtils::move(effector, evalPose, maxRetries_))
+		if (!RobotUtils::move(effector_, evalPose, maxRetries_))
 		{
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
@@ -231,16 +232,14 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 /**************************************************/
 int main(int argn_, char** argv_)
 {
-	// Setup node
 	ros::init(argn_, argv_, "pr2_grasp_evaluator");
 	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
-	// Load the node's configuration
+	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
-
 
 	bool debugEnabled = Config::get()["evaluatorDebug"].as<bool>();
 	std::map<std::string, float> clippingX = Config::get()["evaluator"]["clippingX"].as<std::map<std::string, float> >();
@@ -252,13 +251,9 @@ int main(int argn_, char** argv_)
 	std::string topicName = Config::get()["evaluator"]["pointcloudTopic"].as<std::string>();
 
 
-	// Set subscription
+	/********** Set subscriptions/publishers **********/
 	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, clippingX, clippingZ, debugEnabled));
 
-	// Set service
-	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head));
-
-	// Set debug behavior
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
@@ -269,8 +264,32 @@ int main(int argn_, char** argv_)
 		planeZPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_z", 1, true);
 	}
 
-	// Start the service
+
+	/********** Retrieve the group used for grasping **********/
+	ROS_INFO("Retrieving grasping group");
+	pr2_grasping::GraspingGroup srv;
+	srv.response.result = false;
+	while(!srv.response.result)
+	{
+		if (ros::service::call("/pr2_grasping/effector_name", srv))
+			ROS_INFO("Queried grasping group %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+		ros::Duration(1).sleep();
+	}
+
+
+	/********** Prepare the planning/moving interfaces **********/
+	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(srv.response.groupName);
+	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
+	effector->setEndEffector(effectorNames.second);
+	effector->setPlannerId("RRTConnectkConfigDefault");
+
+
+	/********** Set services **********/
 	ROS_INFO("Starting grasping evaluation service");
+	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head, effector));
+
+
+	/********** Spin the node **********/
 	ros::AsyncSpinner spinner(2);
 	spinner.start();
 	ros::waitForShutdown();
