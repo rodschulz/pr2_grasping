@@ -13,6 +13,6 @@
 	<!-- default 1.2 -->
 	<param name="allowed_execution_duration_scaling" value="1.5"/>
 	<!-- Allow more than the expected execution time before triggering a trajectory cancel (applied after scaling) -->
-	<!-- default 0.5 -->
+	<!-- default 0.5  previous 1.5 -->
 	<param name="allowed_goal_duration_margin" value="1.5"/>
 </launch>

@@ -34,7 +34,7 @@
 			<param name="stall_timeout" type="double" value="0.5"/>
 			<!-- The distance from the desired position at which the result is considered successful -->
 			<!-- default: 0.01 prev 0.0075-->
-			<param name="goal_threshold" type="double" value="0.01"/>
+			<param name="goal_threshold" type="double" value="0.0075"/>
 		</node>
 	</group>
 
