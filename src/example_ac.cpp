@@ -77,7 +77,7 @@ void moveHead()
 
 	ROS_INFO("...sending head goal");
 	headClient->sendGoal(goal);
-	headClient->waitForResult(ros::Duration(2));
+	headClient->waitForResult(ros::Duration(20));
 
 	ROS_INFO("...head moved");
 }
@@ -124,17 +124,17 @@ void actionClientPickup(ros::Publisher &collisionPub_,
 {
 	/********** Generate collision objects **********/
 	ROS_INFO("...adding collisions to the scene");
-	float dimX = 0.13;
-	float dimY = 0.13;
+	float dimX = 0.12;
+	float dimY = 0.12;
 	float dimZ = 0.27;
 	genCollisionObject(collisionPub_, TARGET_ID, targetPose_, dimX, dimY, dimZ);
-	ros::Duration(1.0).sleep();
+	ros::Duration(2.0).sleep();
 
 	dimX = 1.5; //0.92
 	dimY = 0.82; //0.92
-	dimZ = 0.62; //0.78
+	dimZ = 0.45; //0.78
 	genCollisionObject(collisionPub_, SUPPORT_ID, supportPose_, dimX, dimY, dimZ);
-	ros::Duration(1.0).sleep();
+	ros::Duration(2.0).sleep();
 
 
 	/********** Generate grasp **********/
@@ -163,17 +163,19 @@ void actionClientPickup(ros::Publisher &collisionPub_,
 	grasp.pre_grasp_approach.desired_distance = 0.18;
 
 
-	grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+
+	grasp.pre_grasp_posture.joint_names.resize(1, R_GRIPPER_JOINT);
 	grasp.pre_grasp_posture.points.resize(1);
 	grasp.pre_grasp_posture.points[0].positions.resize(1);
-	grasp.pre_grasp_posture.points[0].positions[0] = 0.8;
+	grasp.pre_grasp_posture.points[0].positions[0] = RobotUtils::getPR2GripperJointOpening(0.086);
+	// grasp.pre_grasp_posture.points[0].effort[0] = -1;
 	grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
-	grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+	grasp.grasp_posture.joint_names.resize(1, R_GRIPPER_JOINT);
 	grasp.grasp_posture.points.resize(1);
 	grasp.grasp_posture.points[0].positions.resize(1);
-	grasp.grasp_posture.points[0].positions[0] = 0.01;
+	grasp.grasp_posture.points[0].positions[0] =  RobotUtils::getPR2GripperJointOpening(0.06);
 	grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
@@ -190,7 +192,7 @@ void actionClientPickup(ros::Publisher &collisionPub_,
 	grasp.allowed_touch_objects.push_back("r_gripper_palm_link");
 
 
-	/********** Attempt pickup **********/
+	/********** Generate goal **********/
 	ROS_INFO("...generating pickup goal");
 	moveit_msgs::PickupGoal goal;
 
@@ -220,8 +222,8 @@ void actionClientPickup(ros::Publisher &collisionPub_,
 	ros::Duration(3.0).sleep();
 
 	ROS_INFO("...sending pickup goal");
-	client_->sendGoal(goal);
-	client_->waitForResult(ros::Duration(45.0));
+	actionlib::SimpleClientGoalState st = client_->sendGoalAndWait(goal, ros::Duration(45.0));
+	ROS_INFO("...result: %s", st.toString().c_str());
 
 	ROS_INFO("Client state: %s", client_->getState().toString().c_str());
 	if (client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
@@ -256,19 +258,20 @@ int main(int argn_, char **argv_)
 	moveArmToPose(LEFT_ARM, GraspingUtils::genPose(0.35, 0.5, 1.1), "base_footprint");
 	moveHead();
 	ROS_INFO("Setup completed");
+	ros::Duration(0.5).sleep();
 
 
 	// Generate target's pose
 	geometry_msgs::PoseStamped targetPose;
 	targetPose.header.stamp = ros::Time(0);
 	targetPose.header.frame_id = "odom_combined";
-	targetPose.pose = GraspingUtils::genPose(0.75, 0, 0.63 + 0.23 * 0.5, DEG2RAD(0), 0, 0, 1);
+	targetPose.pose = GraspingUtils::genPose(0.69, 0, 0.465 + 0.23 * 0.5, DEG2RAD(0), 0, 0, 1);
 
 	// Generate support's pose
 	geometry_msgs::PoseStamped supportPose;
 	supportPose.header.stamp = ros::Time(0);
 	supportPose.header.frame_id = "odom_combined";
-	supportPose.pose = GraspingUtils::genPose(1.4, 0, 0.615 * 0.5, DEG2RAD(0), 0, 0, 1);
+	supportPose.pose = GraspingUtils::genPose(1.4, 0, 0.45 * 0.5, DEG2RAD(0), 0, 0, 1);
 
 	// Attempt the pickup
 	actionClientPickup(collisionPub, posePub, pickupClient, targetPose, supportPose);
@@ -281,7 +284,8 @@ int main(int argn_, char **argv_)
 
 
 	ROS_INFO("Routine completed");
-	ros::waitForShutdown();
+	// ros::waitForShutdown();
+	ros::shutdown();
 
 	return EXIT_SUCCESS;
 }
