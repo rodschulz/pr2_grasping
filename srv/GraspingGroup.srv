@@ -1,0 +1,5 @@
+---
+# Name of the group used for the grasping routine
+string groupName
+# Indicates if the group's name was successfully queried
+bool result
