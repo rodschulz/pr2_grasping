@@ -3,6 +3,13 @@
  * 2016
  */
 #include "GraspingUtils.hpp"
+#include <ros/package.h>
+#include <pcl/filters/plane_clipper3D.h>
+#include <pcl/filters/impl/plane_clipper3D.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include "Metric.hpp"
+#include "PointFactory.hpp"
+
 
 std::string GraspingUtils::getConfigPath()
 {

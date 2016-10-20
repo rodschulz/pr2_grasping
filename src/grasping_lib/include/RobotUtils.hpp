@@ -6,7 +6,6 @@
 
 #include <utility>
 #include <string>
-#include <ros/ros.h>
 #include <boost/algorithm/string.hpp>
 #include <moveit/move_group_interface/move_group.h>
 #include <actionlib/client/simple_action_client.h>

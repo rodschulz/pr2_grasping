@@ -5,16 +5,9 @@
 #pragma once
 
 #include <ros/ros.h>
-#include <ros/package.h>
 #include <tf/transform_listener.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/filters/plane_clipper3D.h>
-#include <pcl/filters/impl/plane_clipper3D.hpp>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include "Metric.hpp"
-#include "PointFactory.hpp"
 
 
 #define PACKAGE_NAME		"pr2_grasping"

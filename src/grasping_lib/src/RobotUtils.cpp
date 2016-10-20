@@ -3,6 +3,7 @@
  * 2016
  */
 #include "RobotUtils.hpp"
+#include <ros/ros.h>
 
 std::pair<std::string, std::string> RobotUtils::getEffectorNames(const Effector &arm_)
 {

@@ -4,6 +4,7 @@
  */
 #include <stdlib.h>
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <pr2_grasping/GazeboSetup.h>
