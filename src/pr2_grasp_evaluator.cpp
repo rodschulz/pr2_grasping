@@ -270,7 +270,7 @@ int main(int argn_, char** argv_)
 	{
 		if (ros::service::call(serviceName, srv))
 			ROS_INFO("Grasping group query %s", srv.response.result ? "SUCCESSFUL" : "FAILED, retrying...");
-		ros::Duration(1).sleep();
+		ros::Duration(0.5).sleep();
 	}
 	ROS_INFO("Grasping group: %s", srv.response.groupName.c_str());
 
