@@ -11,7 +11,8 @@
 
 
 #define PACKAGE_NAME		"pr2_grasping"
-#define CONFIG_LOCATION		"config/config.yaml"
+#define CONFIG_DIR			"config/"
+#define CONFIG_LOCATION		CONFIG_DIR "config.yaml"
 
 
 // Axis definition for the cloud clipping methods

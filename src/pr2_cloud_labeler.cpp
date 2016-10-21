@@ -3,6 +3,7 @@
  * 2016
  */
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
@@ -362,12 +363,16 @@ int main(int argn_, char **argv_)
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
 
 
-	/********** Load the BoW definition and prepare the classificator **********/
-	ROS_INFO("Training labeling classifier");
-	cv::Mat BoW;
+	/********** Load the codebook and prepare the classificator **********/
+	ROS_INFO("Loading codebook");
+	cv::Mat codebook;
+	std::string codebookFile = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["labeler"]["codebookLocation"].as<std::string>();
 	std::map<std::string, std::string> metadata;
-	Loader::loadMatrix(Config::get()["labeler"]["bowLocation"].as<std::string>(), BoW, &metadata);
-	svm = ClusteringUtils::prepareClasificator(BoW, metadata);
+	while (!Loader::loadMatrix(codebookFile, codebook, &metadata))
+		ROS_WARN("...unable to load codebook at %s", codebookFile.c_str());
+
+	ROS_INFO("Training labeling classifier");
+	svm = ClusteringUtils::prepareClassificator(codebook, metadata);
 
 
 	/********** Set subscriptions/publishers **********/
