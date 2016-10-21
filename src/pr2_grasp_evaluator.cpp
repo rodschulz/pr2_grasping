@@ -228,6 +228,7 @@ int main(int argn_, char** argv_)
 	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
+
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
@@ -258,16 +259,20 @@ int main(int argn_, char** argv_)
 
 
 	/********** Retrieve the group used for grasping **********/
+	std::string serviceName = "/pr2_grasping/effector_name";
+	while (!ros::service::waitForService(serviceName, ros::Duration(1)))
+		ros::Duration(0.5).sleep();
+
 	ROS_INFO("Retrieving grasping group");
 	pr2_grasping::GraspingGroup srv;
 	srv.response.result = false;
-	while(!srv.response.result)
+	while (!srv.response.result)
 	{
-		if (ros::service::call("/pr2_grasping/effector_name", srv))
-			ROS_INFO("Queried grasping group %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+		if (ros::service::call(serviceName, srv))
+			ROS_INFO("Grasping group query %s", srv.response.result ? "SUCCESSFUL" : "FAILED, retrying...");
 		ros::Duration(1).sleep();
 	}
-	ROS_INFO("Using grasping group %s", srv.response.groupName.c_str());
+	ROS_INFO("Grasping group: %s", srv.response.groupName.c_str());
 
 
 	/********** Prepare the planning/moving interfaces **********/

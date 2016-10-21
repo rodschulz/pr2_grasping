@@ -459,12 +459,21 @@ int main(int _argn, char **_argv)
 
 
 	/********** Setup the robot and environment **********/
+	std::string serviceName = "/pr2_grasping/gazebo_setup";
+	while (!ros::service::waitForService(serviceName, ros::Duration(1)))
+		ros::Duration(0.5).sleep();
+
 	ROS_INFO("Calling setup service");
 	pr2_grasping::GazeboSetup srv;
 	srv.request.resetObject = true;
-	if (ros::service::call("/pr2_grasping/gazebo_setup", srv))
-		ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED");
-	ros::Duration(0.5).sleep();
+	srv.response.result = false;
+	while (!srv.response.result)
+	{
+		if (ros::service::call(serviceName, srv))
+			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
+		ros::Duration(0.5).sleep();
+	}
+	ROS_INFO("Setup done");
 
 
 	/********** Spin the node **********/
