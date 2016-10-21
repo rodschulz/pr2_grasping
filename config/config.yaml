@@ -1,9 +1,9 @@
 ---
 # flag to enable/disable debug
-labelerDebug: true
-analyzerDebug: true
-grasperDebug: true
-evaluatorDebug: true
+labelerDebug: false
+analyzerDebug: false
+grasperDebug: false
+evaluatorDebug: false
 
 
 ##### setup node options #####
@@ -34,8 +34,8 @@ labeler:
     pointcloudTopic: /head_mount_kinect/depth/points
     # sampling voxel size
     voxelSize: 0.004
-    # location of the BoW file
-    bowLocation: src/grasping/config/bow50_c7_1E-4_opencv.dat
+    # location of the codebook file
+    codebookLocation: config/bow50_c7_1E-4_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
