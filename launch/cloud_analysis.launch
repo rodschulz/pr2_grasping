@@ -3,5 +3,3 @@
 
 	<node name="pr2_cluster_analyzer" pkg="pr2_grasping" type="pr2_cluster_analyzer.py" output="screen" respawn="true"/>
 </launch>
-
-
