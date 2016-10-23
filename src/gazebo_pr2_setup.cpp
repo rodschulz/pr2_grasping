@@ -70,10 +70,6 @@ bool moveArms()
 {
 	ROS_DEBUG("...moving arms");
 
-	// group to plane movement for both arms
-	arms = MoveGroupPtr(new moveit::planning_interface::MoveGroup("arms"));
-	arms->setPoseReferenceFrame(FRAME_BASE);
-
 	// Stop any previous movement
 	arms->stop();
 	ros::Duration(1.0).sleep();
@@ -292,7 +288,8 @@ int main(int argn_, char** argv_)
 
 	/********** Set services **********/
 	ROS_INFO("Starting setup service");
-	MoveGroupPtr arms = MoveGroupPtr(new moveit::planning_interface::MoveGroup("arms"));
+	arms = MoveGroupPtr(new moveit::planning_interface::MoveGroup("arms"));
+	arms->setPoseReferenceFrame(FRAME_BASE);
 	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
 
 

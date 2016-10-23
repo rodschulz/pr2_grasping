@@ -418,8 +418,8 @@ void gripperStuckCallback(const std_msgs::Bool &msg_)
 
 
 /**************************************************/
-void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &msg_)
-{}
+// void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &msg_)
+// {}
 
 
 /**************************************************/
@@ -466,7 +466,7 @@ int main(int _argn, char **_argv)
 
 	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
-	ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
+	// ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
 
 	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
