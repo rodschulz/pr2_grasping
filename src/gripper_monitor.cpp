@@ -12,6 +12,8 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include "RobotUtils.hpp"
+#include "GraspingUtils.hpp"
+#include "Config.hpp"
 
 
 /***** Accumulators type definition *****/
@@ -41,14 +43,14 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 	}
 
 
+	double posMean = boost::accumulators::mean(acc.front().first);
 	double posStdDev = sqrt(boost::accumulators::variance(acc.front().first));
+	double effortMean = boost::accumulators::mean(acc.front().second);
 	double effortStdDev = sqrt(boost::accumulators::variance(acc.front().second));
 
-	// ROS_INFO("pos: (%.5f, %.5f) -- eff: (%.5f, %.5f)",
-	// 		 boost::accumulators::mean(acc.front().first),
-	// 		 sqrt(boost::accumulators::variance(acc.front().first)),
-	// 		 boost::accumulators::mean(acc.front().second),
-	// 		 sqrt(boost::accumulators::variance(acc.front().second)));
+
+	ROS_DEBUG("pos: (%.5f, %.5f) -- eff: (%.5f, %.5f)", posMean, posStdDev, effortMean, effortStdDev);
+
 
 	ros::Duration elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
 	if (elapsed.toSec() > 3 && posStdDev < 0.0005 && effortStdDev < 0.2)

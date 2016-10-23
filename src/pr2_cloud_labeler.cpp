@@ -376,8 +376,8 @@ int main(int argn_, char **argv_)
 
 
 	/********** Set subscriptions/publishers **********/
-	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 5);
-	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 5);
+	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1, true);
+	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 1);
 	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
 
 	if (debugEnabled)

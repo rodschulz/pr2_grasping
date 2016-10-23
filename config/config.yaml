@@ -4,6 +4,7 @@ labelerDebug: false
 analyzerDebug: false
 grasperDebug: false
 evaluatorDebug: false
+gmonitorDebug: false
 
 
 ##### setup node options #####
