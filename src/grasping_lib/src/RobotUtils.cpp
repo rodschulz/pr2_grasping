@@ -69,7 +69,7 @@ std::string RobotUtils::getGripperTopic(const std::string &arm_)
 }
 
 
-std::string getArmTopic(const std::string &arm_)
+std::string RobotUtils::getArmTopic(const std::string &arm_)
 {
 	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
 		return "/r_arm_controller/follow_joint_trajectory";

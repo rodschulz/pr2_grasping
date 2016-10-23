@@ -10,12 +10,12 @@
 #include <pr2_grasping/GazeboSetup.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
+#include <std_msgs/Bool.h>
+#include <actionlib_msgs/GoalID.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <control_msgs/GripperCommandGoal.h>
 #include <shape_tools/solid_primitive_dims.h>
-#include <boost/signals2/mutex.hpp>
 #include <deque>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
@@ -26,13 +26,23 @@
 #define GRASP_ID			"target_grasp"
 
 
+enum GripperState
+{
+	STATE_IDLE,
+	STATE_PERFORMING_GRASP,
+	STATE_STUCK
+};
+
 /***** Global variables *****/
-ros::Publisher posePublisher;
-boost::mutex mutex;
+ros::Publisher posePublisher, cancelPublisher;
+boost::mutex pmutex, gmutex;
 std::deque<pr2_grasping::GraspingData> queue;
 unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
+GripperState gState = STATE_IDLE;
+// bool gripperStuck = false;
+// bool performingGras = false;
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -47,9 +57,9 @@ void graspingPointsCallback(const pr2_grasping::GraspingDataConstPtr &msg_)
 		ROS_INFO("New points received");
 
 		// Add the new point to the queue
-		mutex.lock();
+		pmutex.lock();
 		queue.push_back(*msg_);
-		mutex.unlock();
+		pmutex.unlock();
 	}
 	else
 		ROS_INFO_ONCE("Message queue full at size %zu, discarding...", queue.size());
@@ -177,8 +187,8 @@ void releaseObject(MoveGroupPtr &effector_)
 	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, -1));
 	geometry_msgs::PoseStamped current;
 	current.header.frame_id = FRAME_BASE;
-	current.pose.position.x = 0.4;
-	current.pose.position.y = -0.4;
+	current.pose.position.x = 0.35;
+	current.pose.position.y = -0.5;
 	current.pose.position.z = 0.9;
 	current.pose.orientation.w = rotation.w();
 	current.pose.orientation.x = rotation.x();
@@ -189,41 +199,9 @@ void releaseObject(MoveGroupPtr &effector_)
 	if (!RobotUtils::move(effector_, current, 25))
 		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
 
-	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(effector_->getName()), true);
-	while (!client->waitForServer(ros::Duration(5.0)))
-		ROS_INFO("Waiting gripper action server to come online");
+	RobotUtils::moveGripper(effector_->getName(), 1);
 
-	control_msgs::GripperCommandGoal cmd;
-	cmd.command.position =  0.09; // Gripper open 0.07
-	cmd.command.max_effort = -1.0; // No limit for the max effort
-
-	client->cancelAllGoals();
-	ros::Duration(1.0).sleep();
-	client->sendGoal(cmd);
-
-	ROS_INFO("Waiting to complete the gripper action");
-
-	// Send the goal until is reached (apparently this isn't necessary in the real robot)
-	int count = 0;
-	while (true)
-	{
-		count++;
-		if (count % 5 == 0)
-			ROS_INFO("...state %s", client->getState().toString().c_str());
-
-		if (client->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-			break;
-
-		client->sendGoal(cmd);
-		ros::Duration(0.2).sleep();
-	}
-	ROS_INFO("Gripper action completed");
-
-
-	ROS_INFO("Finishing all goals");
-	client->cancelAllGoals();
-	client->stopTrackingGoal();
-	ros::Duration(1.0).sleep();
+	ROS_INFO("Release action completed");
 }
 
 
@@ -311,21 +289,35 @@ void timerCallback(const ros::TimerEvent &event_,
 			std::vector<moveit_msgs::Grasp> grasps;
 			grasps.push_back(grasp);
 
+			// Change gripper state
+			gmutex.lock();
+			gState = STATE_PERFORMING_GRASP;
+			gmutex.unlock();
+
+			// Perform the grasp
+			int maxAttempts = 10;
 			int counter = 0;
-			moveit::planning_interface::MoveItErrorCode errCode;
-			while ((errCode.val == 0 ||
-					errCode.val == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
-					errCode.val == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN) &&
-					counter++ < 10)
+			moveit::planning_interface::MoveItErrorCode code;
+			// while ((code.val == 0 ||
+			// 		code.val == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
+			// 		code.val == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN) &&
+			// 		counter++ < 10)
+			while (code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
+					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+					counter++ < maxAttempts)
 			{
-				errCode = effector_->pick(TARGET_OBJECT, grasps);
-				ROS_INFO("...attempt finished (code: %d)", errCode.val);
+				code = effector_->pick(TARGET_OBJECT, grasps);
+				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
+				ros::Duration(1).sleep();
 			}
 
 
 			// Skip the rest if the planning failed
-			if (errCode.val != moveit_msgs::MoveItErrorCodes::PLANNING_FAILED &&
-					errCode.val != moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
+			// TIMED_OUT
+			// if (code.val != moveit_msgs::MoveItErrorCodes::PLANNING_FAILED &&
+			// 		code.val != moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
+			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
+					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
 			{
 				/********** STAGE 2.5: check the grasping attempt result **********/
 				ROS_INFO("...evaluating result");
@@ -344,7 +336,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			}
 			else
 			{
-				ROS_INFO("...planning attempt failed, skipping evaluation");
+				ROS_INFO("...attempt failed, skipping evaluation");
 				ros::Duration(0.5).sleep();// little wait to be able to read the message
 			}
 
@@ -375,7 +367,9 @@ void timerCallback(const ros::TimerEvent &event_,
 
 		// Remove the processed grasping data
 		ROS_DEBUG("Removing processed grasping data");
+		pmutex.lock();
 		queue.pop_front();
+		pmutex.unlock();
 	}
 
 	// Call the labeling service if no points are queued
@@ -406,6 +400,24 @@ bool queryName(pr2_grasping::GraspingGroup::Request  &request_,
 	return true;
 }
 
+
+/**************************************************/
+void gripperStuckCallback(const std_msgs::Bool &msg_)
+{
+	if (gState == STATE_PERFORMING_GRASP)
+	{
+		ROS_DEBUG("Gripper stuck");
+		gmutex.lock();
+		gState = STATE_STUCK;
+		gmutex.unlock();
+
+		ROS_DEBUG("Canceling gripper action");
+		actionlib_msgs::GoalID goalCancel;
+		cancelPublisher.publish(goalCancel);
+	}
+}
+
+
 /**************************************************/
 int main(int _argn, char **_argv)
 {
@@ -429,7 +441,8 @@ int main(int _argn, char **_argv)
 
 	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
-	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(Config::get()["grasper"]["arm"].as<std::string>());
+	std::string arm = Config::get()["grasper"]["arm"].as<std::string>();
+	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(arm);
 	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
@@ -439,8 +452,13 @@ int main(int _argn, char **_argv)
 
 	/********** Set subscriptions/publishers **********/
 	ROS_INFO("Setting publishers/subscribers");
+	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
 	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
-	ros::Subscriber sub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
+
+	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
+	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
+	ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, gripperStuckCallback);
+
 	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
 	if (debugEnabled)
