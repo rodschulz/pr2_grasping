@@ -36,6 +36,23 @@ std::pair<std::string, std::string> RobotUtils::getEffectorNames(const std::stri
 	}
 }
 
+
+std::string getEffectorFrame(const std::string &arm_)
+{
+	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
+		return FRAME_R_GRIPPER;
+
+	else if (boost::iequals(arm_, "left") || boost::iequals(arm_, "left_arm"))
+		return FRAME_L_GRIPPER;
+
+	else
+	{
+		ROS_WARN("Wrong effector type, assuming right arm");
+		return FRAME_R_GRIPPER;
+	}
+}
+
+
 std::string RobotUtils::getGripperTopic(const std::string &arm_)
 {
 	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
@@ -47,7 +64,23 @@ std::string RobotUtils::getGripperTopic(const std::string &arm_)
 	else
 	{
 		ROS_WARN("Wrong effector type, assuming right arm");
-		return "";
+		return "r_gripper_controller/gripper_action";
+	}
+}
+
+
+std::string getArmTopic(const std::string &arm_)
+{
+	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
+		return "/r_arm_controller/follow_joint_trajectory";
+
+	else if (boost::iequals(arm_, "left") || boost::iequals(arm_, "left_arm"))
+		return "/l_arm_controller/follow_joint_trajectory";
+
+	else
+	{
+		ROS_WARN("Wrong effector type, assuming right arm");
+		return "/r_arm_controller/follow_joint_trajectory";
 	}
 }
 
@@ -150,4 +183,23 @@ float RobotUtils::getPR2GripperJointOpening(const float gap_)
 		oppening = gap_ / GAP_CONVERSION_RATIO;
 
 	return oppening;
+}
+
+actionlib::SimpleClientGoalState RobotUtils::moveGripper(const std::string arm_,
+		const float position_,
+		const float maxEffort_)
+{
+	GripperClient *client = new GripperClient(RobotUtils::getGripperTopic(arm_), true);
+	while (!client->waitForServer(ros::Duration(5.0)))
+		ROS_INFO("Waiting for gripper action server");
+
+	control_msgs::GripperCommandGoal cmd;
+	cmd.command.position =  position_;
+	cmd.command.max_effort = maxEffort_;
+
+	client->cancelAllGoals();
+	ros::Duration(1.0).sleep();
+
+	ROS_INFO("Sending gripper goal");
+	return client->sendGoalAndWait(cmd);
 }

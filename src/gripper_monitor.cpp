@@ -3,62 +3,130 @@
  * 2016
  */
 #include <ros/ros.h>
-#include <std_msgs/String.h>
-#include <pr2_controllers_msgs/Pr2GripperCommandActionFeedback.h>
-#include <pr2_controllers_msgs/Pr2GripperCommandActionGoal.h>
+#include <std_msgs/Bool.h>
+#include <control_msgs/GripperCommandActionFeedback.h>
+#include <control_msgs/GripperCommandActionGoal.h>
+#include <control_msgs/GripperCommandActionResult.h>
 #include <pr2_grasping/GraspingGroup.h>
-#include <boost/algorithm/string.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 #include "RobotUtils.hpp"
 
 
+/***** Accumulators type definition *****/
+typedef boost::accumulators::accumulator_set<double, boost::accumulators::stats<boost::accumulators::tag::variance> > AccType;
+
+/***** Global variables *****/
+boost::mutex mutex;
+std::list<control_msgs::GripperCommandActionFeedback> feedback;
+std::list< std::pair<AccType, AccType> > acc;
+
+
 /**************************************************/
-void feedbackReceived(const pr2_controllers_msgs::Pr2GripperCommandActionFeedbackConstPtr &msg_)
+void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &msg_,
+					  ros::Publisher &stuckPublisher_)
 {
+	mutex.lock();
+
+	// Track feedback messages to know the elapsed time
+	feedback.push_back(*msg_);
+	// Add new accumulator to get the stats of the last elapsed period
+	acc.push_back(std::pair<AccType, AccType>());
+
+	for (std::list< std::pair<AccType, AccType> >::iterator it = acc.begin(); it != acc.end(); it++)
+	{
+		it->first(msg_->feedback.position);
+		it->second(msg_->feedback.effort);
+	}
+
+
+	double posStdDev = sqrt(boost::accumulators::variance(acc.front().first));
+	double effortStdDev = sqrt(boost::accumulators::variance(acc.front().second));
+
+	// ROS_INFO("pos: (%.5f, %.5f) -- eff: (%.5f, %.5f)",
+	// 		 boost::accumulators::mean(acc.front().first),
+	// 		 sqrt(boost::accumulators::variance(acc.front().first)),
+	// 		 boost::accumulators::mean(acc.front().second),
+	// 		 sqrt(boost::accumulators::variance(acc.front().second)));
+
+	ros::Duration elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
+	if (elapsed.toSec() > 3 && posStdDev < 0.0005 && effortStdDev < 0.2)
+	{
+		std_msgs::Bool stuckMsg;
+		stuckMsg.data = true;
+		stuckPublisher_.publish(stuckMsg);
+	}
+
+	// Remove old stuff
+	while (elapsed.toSec() > 3)
+	{
+		feedback.pop_front();
+		acc.pop_front();
+		elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
+	}
+
+	mutex.unlock();
 }
 
 
 /**************************************************/
-void newGoal(const pr2_controllers_msgs::Pr2GripperCommandActionGoalConstPtr &msg_)
+void newGoal(const control_msgs::GripperCommandActionGoalConstPtr &msg_)
 {
+	mutex.lock();
+	feedback.clear();
+	acc.clear();
+	mutex.unlock();
 }
 
 
 /**************************************************/
 int main(int argn_, char **argv_)
 {
-	ros::init(argn_, argv_, "pr2_cloud_labeler");
+	ros::init(argn_, argv_, "gripper_monitor");
 	ros::NodeHandle handler;
+
+	// Load the node's configuration
+	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
+	if (!Config::load(GraspingUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+
+	if (Config::get()["gmonitorDebug"].as<bool>())
+	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
+	}
 
 
 	/********** Retrieve the group used for grasping **********/
+	std::string serviceName = "/pr2_grasping/effector_name";
+	while (!ros::service::waitForService(serviceName, ros::Duration(1)))
+		ros::Duration(0.5).sleep();
+
 	ROS_INFO("Retrieving grasping group");
 	pr2_grasping::GraspingGroup srv;
 	srv.response.result = false;
-	while(!srv.response.result)
+	while (!srv.response.result)
 	{
-		if (ros::service::call("/pr2_grasping/effector_name", srv))
-			ROS_INFO("Queried grasping group %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
-		ros::Duration(1).sleep();
+		if (ros::service::call(serviceName, srv))
+			ROS_INFO("Grasping group query %s", srv.response.result ? "SUCCESSFUL" : "FAILED, retrying...");
+		ros::Duration(0.5).sleep();
 	}
-	ROS_INFO("Using grasping group %s", srv.response.groupName.c_str());
+	ROS_INFO("Grasping group: %s", srv.response.groupName.c_str());
 
-
-	//r_gripper_controller/gripper_action/cancel		actionlib_msgs/GoalID
-	//r_gripper_controller/gripper_action/feedback		pr2_controllers_msgs/Pr2GripperCommandActionFeedback
-	//r_gripper_controller/gripper_action/goal			pr2_controllers_msgs/Pr2GripperCommandActionResult
-	//r_gripper_controller/gripper_action/result		pr2_controllers_msgs/Pr2GripperCommandActionGoal
-	//r_gripper_controller/gripper_action/status		actionlib_msgs/GoalStatusArray
 
 	/********** Set subscriptions/publishers **********/
+	ros::Publisher stuckPublisher = handler.advertise<std_msgs::Bool>("/pr2_grasping/gripper_action_stuck", 1);
 	std::string baseTopic = RobotUtils::getGripperTopic(srv.response.groupName);
-	ros::Subscriber feedbackSubscriber = handler.subscribe<pr2_controllers_msgs::Pr2GripperCommandActionFeedback>(baseTopic + "/feedback", 1, feedbackReceived);
-	ros::Subscriber goalSubscriber = handler.subscribe<pr2_controllers_msgs::Pr2GripperCommandActionGoal>(baseTopic + "/goal", 1, newGoal);
+	ros::Subscriber feedbackSubscriber = handler.subscribe<control_msgs::GripperCommandActionFeedback>(baseTopic + "/feedback", 1, boost::bind(feedbackReceived, _1, stuckPublisher));
+	ros::Subscriber goalSubscriber = handler.subscribe<control_msgs::GripperCommandActionGoal>(baseTopic + "/goal", 1, newGoal);
 
 
 	/********** Spin the node **********/
 	ros::AsyncSpinner spinner(3);
 	spinner.start();
 	ros::waitForShutdown();
+
 
 	return EXIT_SUCCESS;
 }

@@ -21,10 +21,13 @@ enum Effector
 };
 
 
+/***** Robot interesting frames *****/
 #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
 #define FRAME_BASE			"base_footprint"
+#define FRAME_R_GRIPPER		"r_gripper_tool_frame"
+#define FRAME_L_GRIPPER		"l_gripper_tool_frame"
 
-// Gripper related definitions
+/***** Gripper related definitions *****/
 #define GRIPPER_OPEN			0.086
 #define GRIPPER_CLOSED			0.0
 #define GAP_CONVERSION_RATIO	0.1714
@@ -54,7 +57,13 @@ public:
 	static std::pair<std::string, std::string> getEffectorNames(const std::string &arm_);
 
 	/**************************************************/
+	static std::string getEffectorFrame(const std::string &arm_);
+
+	/**************************************************/
 	static std::string getGripperTopic(const std::string &arm_);
+
+	/**************************************************/
+	static std::string getArmTopic(const std::string &arm_);
 
 	/**************************************************/
 	static bool planAndMove(MoveGroupPtr &group_,
@@ -72,6 +81,11 @@ public:
 
 	/**************************************************/
 	static float getPR2GripperJointOpening(const float gap_);
+
+	/**************************************************/
+	static actionlib::SimpleClientGoalState moveGripper(const std::string arm_,
+			const float position_,
+			const float maxEffort_ = -1);
 
 private:
 	// Constructor
