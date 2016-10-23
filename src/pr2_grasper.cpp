@@ -12,6 +12,7 @@
 #include <pr2_grasping/GraspingGroup.h>
 #include <std_msgs/Bool.h>
 #include <actionlib_msgs/GoalID.h>
+#include <control_msgs/FollowJointTrajectoryActionResult.h>
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -41,8 +42,6 @@ unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
-// bool gripperStuck = false;
-// bool performingGras = false;
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -196,7 +195,7 @@ void releaseObject(MoveGroupPtr &effector_)
 	current.pose.orientation.z = rotation.z();
 	effector_->setPoseTarget(current);
 
-	if (!RobotUtils::move(effector_, current, 25))
+	if (!RobotUtils::move(effector_, 25))
 		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
 
 	RobotUtils::moveGripper(effector_->getName(), 1);
@@ -419,6 +418,11 @@ void gripperStuckCallback(const std_msgs::Bool &msg_)
 
 
 /**************************************************/
+void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &msg_)
+{}
+
+
+/**************************************************/
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
@@ -457,9 +461,9 @@ int main(int _argn, char **_argv)
 
 	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
-	ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, gripperStuckCallback);
+	ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
 
-	ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
+	// ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
 	if (debugEnabled)
 	{

@@ -71,7 +71,6 @@ public:
 
 	/**************************************************/
 	static bool move(MoveGroupPtr &group_,
-					 const geometry_msgs::PoseStamped &pose_,
 					 const int maxRetries_ = -1);
 
 	/**************************************************/

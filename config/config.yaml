@@ -1,5 +1,6 @@
 ---
 # flag to enable/disable debug
+setupDebug: false
 labelerDebug: false
 analyzerDebug: false
 grasperDebug: false
@@ -20,8 +21,8 @@ setup:
     displacementThreshold: 1.0
     headTarget: {x: 0.9, y: 0.0, z: 0.5}
     armsPosition:
-      right: {x: 0.1, y: -0.5, z: 1.0}
-      left: {x: 0.1, y: 0.5, z: 1.0}
+      right: {x: 0.0, y: -0.7, z: 0.9}
+      left: {x: 0.0, y: 0.7, z: 0.9}
 
     # reset target config
     type: reset # reset or respawn

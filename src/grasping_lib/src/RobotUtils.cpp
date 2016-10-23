@@ -114,7 +114,6 @@ bool RobotUtils::planAndMove(MoveGroupPtr &group_,
 
 
 bool RobotUtils::move(MoveGroupPtr &group_,
-					  const geometry_msgs::PoseStamped &pose_,
 					  const int maxRetries_)
 {
 	int retries = 0;

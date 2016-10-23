@@ -26,6 +26,7 @@ float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
 std::pair<std::string, geometry_msgs::Pose> state;
 YAML::Node models;
+MoveGroupPtr arms;
 
 
 /**************************************************/
@@ -33,7 +34,7 @@ void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 {
 	if (!stopDisplacement && msg_->pose.pose.position.x >= displacementThreshold)
 	{
-		ROS_INFO("Destination reached");
+		ROS_DEBUG("...base destination reached");
 		stopDisplacement = true;
 	}
 }
@@ -42,6 +43,8 @@ void displacementCallback(const nav_msgs::Odometry::ConstPtr &msg_)
 /**************************************************/
 void liftUpTorso()
 {
+	ROS_DEBUG("...moving torso");
+
 	// define action client
 	TorsoClient *torsoClient = new TorsoClient("torso_controller/position_joint_action", true);
 
@@ -49,16 +52,14 @@ void liftUpTorso()
 	while (!torsoClient->waitForServer(ros::Duration(5.0)))
 		ROS_INFO("Waiting for action server to come up");
 
-	ROS_INFO("Lifting up torso");
-
+	ROS_INFO("...lifting torso");
 	control_msgs::SingleJointPositionGoal torsoGoal;
 	torsoGoal.position = Config::get()["setup"]["torsoPosition"].as<float>(0.18);
 	torsoGoal.min_duration = ros::Duration(1.0);
 	torsoGoal.max_velocity = 5.0;
 
-	ROS_INFO("...sending torso goal");
-	torsoClient->sendGoal(torsoGoal);
-	torsoClient->waitForResult();
+	ROS_DEBUG("...sending goal");
+	torsoClient->sendGoalAndWait(torsoGoal);
 
 	ROS_INFO("...torso lifted up");
 }
@@ -67,83 +68,63 @@ void liftUpTorso()
 /**************************************************/
 bool moveArms()
 {
-	ROS_INFO("Preparing arms setup");
+	ROS_DEBUG("...moving arms");
 
 	// group to plane movement for both arms
-	moveit::planning_interface::MoveGroup armsGroup("arms");
-	armsGroup.setPoseReferenceFrame(FRAME_BASE);
-
-	// right arm pose
-	geometry_msgs::Pose rightArmPose;
-	rightArmPose.orientation.w = 1.0;
-	rightArmPose.position.x = Config::get()["setup"]["armsPosition"]["right"]["x"].as<float>(0.3);
-	rightArmPose.position.y = Config::get()["setup"]["armsPosition"]["right"]["y"].as<float>(-0.5);
-	rightArmPose.position.z = Config::get()["setup"]["armsPosition"]["right"]["z"].as<float>(1.1);
-
-	// left arm pose
-	geometry_msgs::Pose leftArmPose;
-	leftArmPose.orientation.w = 1.0;
-	leftArmPose.position.x = Config::get()["setup"]["armsPosition"]["left"]["x"].as<float>(0.3);
-	leftArmPose.position.y = Config::get()["setup"]["armsPosition"]["left"]["y"].as<float>(0.5);
-	leftArmPose.position.z = Config::get()["setup"]["armsPosition"]["left"]["z"].as<float>(1.1);
-
-	// set the pose for each arm
-	armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
-	armsGroup.setPoseTarget(leftArmPose, "l_wrist_roll_link");
+	arms = MoveGroupPtr(new moveit::planning_interface::MoveGroup("arms"));
+	arms->setPoseReferenceFrame(FRAME_BASE);
 
 	// Stop any previous movement
-	armsGroup.stop();
+	arms->stop();
 	ros::Duration(1.0).sleep();
 
-	// plan the trajectory
-	moveit::planning_interface::MoveGroup::Plan armsPlan;
-	ROS_INFO("...planing arms trajectory");
+	Eigen::Quaternionf orientation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, 1));
 
-	int counter = 0;
-	bool planningOk = armsGroup.plan(armsPlan);
-	while (!planningOk)
-	{
-		ROS_INFO(".....planning failed, retrying");
-		ros::Duration(0.5).sleep();
-		armsGroup.setPoseTarget(armsGroup.getRandomPose());
-		armsGroup.move();
+	// right arm pose
+	geometry_msgs::PoseStamped rightArm;
+	rightArm.header.frame_id = FRAME_BASE;
+	// rightArm.pose.orientation.w = 1.0;
+	rightArm.pose.position.x = Config::get()["setup"]["armsPosition"]["right"]["x"].as<float>(0.3);
+	rightArm.pose.position.y = Config::get()["setup"]["armsPosition"]["right"]["y"].as<float>(-0.5);
+	rightArm.pose.position.z = Config::get()["setup"]["armsPosition"]["right"]["z"].as<float>(1.1);
+	rightArm.pose.orientation.x = orientation.x();
+	rightArm.pose.orientation.y = orientation.y();
+	rightArm.pose.orientation.z = orientation.z();
+	rightArm.pose.orientation.w = orientation.w();
 
-		ros::Duration(0.5).sleep();
-		armsGroup.setPoseTarget(rightArmPose, "r_wrist_roll_link");
-		armsGroup.setPoseTarget(leftArmPose, "l_wrist_roll_link");
+	// left arm pose
+	geometry_msgs::PoseStamped leftArm;
+	leftArm.header.frame_id = FRAME_BASE;
+	// leftArm.pose.orientation.w = 1.0;
+	leftArm.pose.position.x = Config::get()["setup"]["armsPosition"]["left"]["x"].as<float>(0.3);
+	leftArm.pose.position.y = Config::get()["setup"]["armsPosition"]["left"]["y"].as<float>(0.5);
+	leftArm.pose.position.z = Config::get()["setup"]["armsPosition"]["left"]["z"].as<float>(1.1);
+	leftArm.pose.orientation.x = orientation.x();
+	leftArm.pose.orientation.y = orientation.y();
+	leftArm.pose.orientation.z = orientation.z();
+	leftArm.pose.orientation.w = orientation.w();
 
-		if (++counter > 25)
-		{
-			ROS_INFO("...too many retries, stopping");
-			break;
-		}
 
-		planningOk = armsGroup.plan(armsPlan);
-	}
-	ROS_INFO("...trajectory plan %s", planningOk ? "" : "FAILED");
+	// set the pose for each arm
+	arms->setPoseTarget(rightArm, "r_wrist_roll_link");
+	arms->setPoseTarget(leftArm, "l_wrist_roll_link");
 
-	// move the arms
-	if (planningOk)
-	{
-		ROS_INFO("...moving arms");
-		armsGroup.move();
-		ROS_INFO("...arms movement completed");
-	}
-
-	return planningOk;
+	ROS_DEBUG("...attempting move");
+	return RobotUtils::move(arms, 30);
 }
 
 
 /**************************************************/
 void moveBase()
 {
-	ROS_INFO("Moving robot base");
+	ROS_DEBUG("...moving robot base");
 
 	geometry_msgs::Twist cmd;
 	cmd.linear.x = 4;
 	cmd.linear.y = cmd.linear.z = 0;
 	cmd.angular.x = cmd.angular.y = cmd.angular.z = 0;
 
+	ROS_INFO("...sending displacement messages");
 	while (ros::ok() && !stopDisplacement)
 		cmdPublisher.publish(cmd);
 
@@ -154,6 +135,11 @@ void moveBase()
 /**************************************************/
 void moveHead()
 {
+	ROS_DEBUG("...moving head");
+
+	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
+		ros::console::notifyLoggerLevelsChanged();
+
 	RobotUtils::moveHead(Config::get()["setup"]["headTarget"]["x"].as<float>(0.9),
 						 Config::get()["setup"]["headTarget"]["y"].as<float>(0),
 						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5));
@@ -165,6 +151,8 @@ void moveHead()
 /**************************************************/
 void retrieveWorldState()
 {
+	ROS_DEBUG("...retrieving world state");
+
 	std::vector<std::string> list = Config::get()["setup"]["ignore"].as<std::vector<std::string> >();
 	std::map<std::string, bool> ignoreMap;
 	for (std::vector<std::string>::const_iterator it = list.begin(); it != list.end(); it++)
@@ -236,7 +224,7 @@ bool resetObject()
 bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 			  pr2_grasping::GazeboSetup::Response & response_)
 {
-	ROS_INFO("Beginning gazebo setup routine");
+	ROS_INFO("Beginning setup routine...");
 
 	if (Config::get()["setup"]["liftTorso"].as<bool>())
 		liftUpTorso();
@@ -255,8 +243,10 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 	if (request_.resetObject)
 		respawnOk = resetObject();
 
-	ROS_INFO("Gazebo setup routine finished");
+
 	response_.result = respawnOk && armsOk;
+	ROS_INFO("Setup routine %s...", response_.result ? "SUCCESSFUL" : "FAILED");
+
 
 	return true;
 }
@@ -265,33 +255,46 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 /**************************************************/
 int main(int argn_, char** argv_)
 {
-	// Setup node
 	ros::init(argn_, argv_, "gazebo_pr2_setup");
 	ros::NodeHandle handler;
 
-	// Load the node's configuration
+
+	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
-	// Load config data
+	bool debugEnabled = Config::get()["setupDebug"].as<bool>();
 	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>();
 	respawn = boost::iequals("respawn", Config::get()["setup"]["type"].as<std::string>());
 	models = YAML::LoadFile(ros::package::getPath(PACKAGE_NAME) + "/config/" + Config::get()["setup"]["modelsFile"].as<std::string>());
+
+	if (debugEnabled)
+	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
+	}
+
+
+	/********** Retrieve the initial world state **********/
 	retrieveWorldState();
 
-	// Publisher and subscriber for base's movement
+
+	/********** Set subscriptions/publishers **********/
 	cmdPublisher = handler.advertise<geometry_msgs::Twist>("/base_controller/command", 1);
 	ros::Subscriber poseSubscriber = handler.subscribe("/base_pose_ground_truth", 1, displacementCallback);
 
-	// Service for setup configuration
+
+	/********** Set services **********/
+	ROS_INFO("Starting setup service");
+	MoveGroupPtr arms = MoveGroupPtr(new moveit::planning_interface::MoveGroup("arms"));
 	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
 
 
-	ROS_INFO("Starting setup service");
 	ros::AsyncSpinner spinner(3);
 	spinner.start();
 	ros::waitForShutdown();
+
 
 	return EXIT_SUCCESS;
 }

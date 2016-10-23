@@ -186,7 +186,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 				  evalPose.pose.orientation.z,
 				  evalPose.pose.orientation.w);
 
-		if (!RobotUtils::move(effector_, evalPose, maxRetries_))
+		if (!RobotUtils::move(effector_, maxRetries_))
 		{
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
