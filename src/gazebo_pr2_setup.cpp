@@ -259,6 +259,11 @@ int main(int argn_, char** argv_)
 	ros::NodeHandle handler;
 
 
+	/********** Start spinning **********/
+	ros::AsyncSpinner spinner(3);
+	spinner.start();
+
+
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
@@ -291,10 +296,6 @@ int main(int argn_, char** argv_)
 	ros::ServiceServer setupService = handler.advertiseService("/pr2_grasping/gazebo_setup", runSetup);
 
 
-	ros::AsyncSpinner spinner(3);
-	spinner.start();
 	ros::waitForShutdown();
-
-
 	return EXIT_SUCCESS;
 }

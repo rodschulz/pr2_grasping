@@ -88,7 +88,13 @@ int main(int argn_, char **argv_)
 	ros::init(argn_, argv_, "gripper_monitor");
 	ros::NodeHandle handler;
 
-	// Load the node's configuration
+
+	/********** Start spinning **********/
+	ros::AsyncSpinner spinner(3);
+	spinner.start();
+
+
+	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
@@ -124,11 +130,6 @@ int main(int argn_, char **argv_)
 	ros::Subscriber goalSubscriber = handler.subscribe<control_msgs::GripperCommandActionGoal>(baseTopic + "/goal", 1, newGoal);
 
 
-	/********** Spin the node **********/
-	ros::AsyncSpinner spinner(3);
-	spinner.start();
 	ros::waitForShutdown();
-
-
 	return EXIT_SUCCESS;
 }

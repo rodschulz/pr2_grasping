@@ -229,6 +229,11 @@ int main(int argn_, char** argv_)
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
 
+	/********** Start spinning **********/
+	ros::AsyncSpinner spinner(2);
+	spinner.start();
+
+
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
@@ -287,10 +292,6 @@ int main(int argn_, char** argv_)
 	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head, effector));
 
 
-	/********** Spin the node **********/
-	ros::AsyncSpinner spinner(2);
-	spinner.start();
 	ros::waitForShutdown();
-
 	return EXIT_SUCCESS;
 }

@@ -431,6 +431,11 @@ int main(int _argn, char **_argv)
 	moveit::planning_interface::PlanningSceneInterface planningScene;
 
 
+	/********** Start spinning **********/
+	ros::AsyncSpinner spinner(3);
+	spinner.start();
+
+
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
@@ -463,7 +468,7 @@ int main(int _argn, char **_argv)
 	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
 	ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
 
-	// ros::Timer timer = handler.createTimer(ros::Duration(1), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
+	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
 
 	if (debugEnabled)
 	{
@@ -498,11 +503,6 @@ int main(int _argn, char **_argv)
 	ROS_INFO("Setup done");
 
 
-	/********** Spin the node **********/
-	ros::AsyncSpinner spinner(3);
-	spinner.start();
 	ros::waitForShutdown();
-
-
 	return EXIT_SUCCESS;
 }

@@ -351,6 +351,11 @@ int main(int argn_, char **argv_)
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
 
 
+	/********** Start spinning **********/
+	ros::AsyncSpinner spinner(2);
+	spinner.start();
+
+
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
 	if (!Config::load(GraspingUtils::getConfigPath()))
@@ -395,11 +400,6 @@ int main(int argn_, char **argv_)
 	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
 
 
-	/********** Spin the node **********/
-	ros::AsyncSpinner spinner(2);
-	spinner.start();
 	ros::waitForShutdown();
-
-
 	return EXIT_SUCCESS;
 }
