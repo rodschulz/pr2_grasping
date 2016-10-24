@@ -76,7 +76,8 @@ public:
 	/**************************************************/
 	static void moveHead(const float x_,
 						 const float y_,
-						 const float z_);
+						 const float z_,
+						 const std::string &frameId_);
 
 	/**************************************************/
 	static float getPR2GripperJointOpening(const float gap_);

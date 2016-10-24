@@ -77,8 +77,6 @@ evaluator:
     maxRetries: 30
     # object position for evaluation of grasping attempt (relative to 'base_footprint')
     position: {x: 0.45, y: 0, z: 0.7}
-    # hear target for evaluation of grasping attempt (relative to 'base_footprint')
-    head: {x: 0.9, y: 0.0, z: 0.5}
     # point cloud input topic (/head_mount_kinect/depth/points or /move_group/filtered_cloud)
     pointcloudTopic: /move_group/filtered_cloud 
 

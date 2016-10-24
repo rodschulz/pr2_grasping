@@ -37,7 +37,7 @@ std::pair<std::string, std::string> RobotUtils::getEffectorNames(const std::stri
 }
 
 
-std::string getEffectorFrame(const std::string &arm_)
+std::string RobotUtils::getEffectorFrame(const std::string &arm_)
 {
 	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
 		return FRAME_R_GRIPPER;
@@ -137,7 +137,8 @@ bool RobotUtils::move(MoveGroupPtr &group_,
 
 void RobotUtils::moveHead(const float x_,
 						  const float y_,
-						  const float z_)
+						  const float z_,
+						  const std::string &frameId_)
 {
 	// define action client
 	HeadClient *headClient = new HeadClient("/head_traj_controller/point_head_action", true);
@@ -150,7 +151,7 @@ void RobotUtils::moveHead(const float x_,
 
 	// the target point, expressed in the given frame
 	geometry_msgs::PointStamped targetPoint;
-	targetPoint.header.frame_id = FRAME_BASE;
+	targetPoint.header.frame_id = frameId_;
 	targetPoint.point.x = x_;
 	targetPoint.point.y = y_;
 	targetPoint.point.z = z_;

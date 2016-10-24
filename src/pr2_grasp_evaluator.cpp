@@ -130,7 +130,6 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 					  const int successThreshold_,
 					  const int maxRetries_,
 					  const std::map<std::string, float> &object_,
-					  const std::map<std::string, float> &head_,
 					  MoveGroupPtr effector_)
 {
 	// Prevent excessive logging from the action client library
@@ -143,13 +142,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	mutex.unlock();
 
 
-	/***** STAGE 1: prepare the robot *****/
-	// Point the head to the evaluation pose
-	RobotUtils::moveHead(head_.find("x")->second, head_.find("y")->second, head_.find("z")->second);
-	ros::Duration(0.5).sleep();
-
-
-	/***** STAGE 2: evaluate different object's positions *****/
+	/***** Evaluate different object's positions *****/
 	// Stop any previous movement
 	effector_->stop();
 	ros::Duration(0.5).sleep();
@@ -167,6 +160,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 
 	// Iterate testing a set of poses to evaluate the grasping result
+	std::string effectorName = effector_->getName();
 	while (status.size() < 4)
 	{
 		evalPose.pose.orientation.w = rotation.w();
@@ -191,6 +185,12 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
 			return false;
 		}
+
+
+		// Point the head to the evaluation pose
+		RobotUtils::moveHead(0, 0, 0, RobotUtils::getEffectorFrame(effectorName));
+		ros::Duration(0.5).sleep();
+
 
 		// Schedule the evaluation over the point clouds
 		mutex.lock();
@@ -245,7 +245,6 @@ int main(int argn_, char** argv_)
 	int successThreshold = Config::get()["evaluator"]["successThreshold"].as<int>();
 	int maxRetries = Config::get()["evaluator"]["maxRetries"].as<int>();
 	std::map<std::string, float> object = Config::get()["evaluator"]["position"].as<std::map<std::string, float> >();
-	std::map<std::string, float> head = Config::get()["evaluator"]["head"].as<std::map<std::string, float> >();
 	std::string topicName = Config::get()["evaluator"]["pointcloudTopic"].as<std::string>();
 
 
@@ -289,7 +288,7 @@ int main(int argn_, char** argv_)
 
 	/********** Set services **********/
 	ROS_INFO("Starting grasping evaluation service");
-	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, head, effector));
+	ros::ServiceServer evaluationService = handler.advertiseService<pr2_grasping::GraspEvaluator::Request, pr2_grasping::GraspEvaluator::Response>("/pr2_grasping/grasp_evaluator", boost::bind(evaluateGrasping, _1, _2, successThreshold, maxRetries, object, effector));
 
 
 	ros::waitForShutdown();

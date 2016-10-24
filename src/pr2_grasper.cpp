@@ -23,8 +23,9 @@
 #include "RobotUtils.hpp"
 
 
-#define TARGET_OBJECT		"target_object"
-#define GRASP_ID			"target_grasp"
+#define OBJECT_TARGET		"object_target"
+#define OBJECT_SUPPORT		"object_support"
+#define GRASP_ID			"grasp_target"
 
 
 enum GripperState
@@ -130,7 +131,8 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 							const std::string &referenceFrame_,
 							const geometry_msgs::PoseStamped &graspingPose_,
-							const std::string &targetObject_)
+							const std::string &objectTarget_,
+							const std::string &objectSupport_)
 {
 	moveit_msgs::Grasp grasp;
 	grasp.id = graspId_;
@@ -166,7 +168,8 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.post_grasp_retreat.desired_distance = 0.2;
 
 	grasp.allowed_touch_objects.clear();
-	grasp.allowed_touch_objects.push_back(targetObject_);
+	grasp.allowed_touch_objects.push_back(objectTarget_);
+	grasp.allowed_touch_objects.push_back(objectSupport_);
 
 	return grasp;
 }
@@ -226,24 +229,33 @@ void timerCallback(const ros::TimerEvent &event_,
 		float colX = (minPt.point.x + maxPt.point.x) * 0.5;
 		float colY = (minPt.point.y + maxPt.point.y) * 0.5;
 		float colZ = (minPt.point.z + maxPt.point.z) * 0.5;
-		geometry_msgs::Pose collisionPose = GraspingUtils::genPose(colX, colY, colZ);
+		geometry_msgs::Pose targetPose = GraspingUtils::genPose(colX, colY, colZ);
 
 		if (debugEnabled_)
 		{
 			ROS_DEBUG("Publishing collision pose");
-			geometry_msgs::PoseStamped collisionPoseMsg;
-			collisionPoseMsg.header.frame_id = minPt.header.frame_id;
-			collisionPoseMsg.pose = collisionPose;
-			collisionPosePublisher.publish(collisionPoseMsg);
+			geometry_msgs::PoseStamped targetPoseMsg;
+			targetPoseMsg.header.frame_id = minPt.header.frame_id;
+			targetPoseMsg.pose = targetPose;
+			collisionPosePublisher.publish(targetPoseMsg);
 		}
 
 		float dimX = maxPt.point.x - minPt.point.x + collisionMargin;
 		float dimY = maxPt.point.y - minPt.point.y + collisionMargin;
 		float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
-		moveit_msgs::CollisionObject targetCollision = genCollisionObject(TARGET_OBJECT, FRAME_BASE, collisionPose, dimX, dimY, dimZ);
+		moveit_msgs::CollisionObject targetCollision = genCollisionObject(OBJECT_TARGET, FRAME_BASE, targetPose, dimX, dimY, dimZ);
+
+		// Generate collision for the support object
+		dimX = 1.5;
+		dimY = 0.82;
+		dimZ = 0.46;
+		geometry_msgs::Pose supportPose = GraspingUtils::genPose(1.35, 0, 0.23);
+		moveit_msgs::CollisionObject supportCollision = genCollisionObject(OBJECT_SUPPORT, FRAME_BASE, supportPose, dimX, dimY, dimZ);
+
 
 		std::vector<moveit_msgs::CollisionObject> collisions;
 		collisions.push_back(targetCollision);
+		collisions.push_back(supportCollision);
 
 
 		/*********************************************************/
@@ -280,7 +292,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 			/********** STAGE 2.3: synthesize grasp **********/
 			ROS_INFO("...synthesizing grasp");
-			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, TARGET_OBJECT);
+			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 
 			/********** STAGE 2.4: attempt grasp **********/
@@ -305,7 +317,7 @@ void timerCallback(const ros::TimerEvent &event_,
 					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
 					counter++ < maxAttempts)
 			{
-				code = effector_->pick(TARGET_OBJECT, grasps);
+				code = effector_->pick(OBJECT_TARGET, grasps);
 				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
 				ros::Duration(1).sleep();
 			}
@@ -342,12 +354,13 @@ void timerCallback(const ros::TimerEvent &event_,
 
 			/********** STAGE 2.7: remove collision objects **********/
 			ROS_INFO("...detaching collision objects");
-			effector_->detachObject(TARGET_OBJECT);
+			effector_->detachObject(OBJECT_TARGET);
 			ros::Duration(0.5).sleep();
 
 			ROS_INFO("...removing collision objects");
 			std::vector<std::string> ids;
-			ids.push_back(TARGET_OBJECT);
+			ids.push_back(OBJECT_TARGET);
+			ids.push_back(OBJECT_SUPPORT);
 			planningScene_->removeCollisionObjects(ids);
 			ros::Duration(0.5).sleep();
 
@@ -418,11 +431,6 @@ void gripperStuckCallback(const std_msgs::Bool &msg_)
 
 
 /**************************************************/
-// void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &msg_)
-// {}
-
-
-/**************************************************/
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
@@ -456,28 +464,7 @@ int main(int _argn, char **_argv)
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 	effector->allowReplanning(true);
-	effector->setNumPlanningAttempts(5);
-
-
-	/********** Set subscriptions/publishers **********/
-	ROS_INFO("Setting publishers/subscribers");
-	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
-	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
-
-	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
-	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
-	// ros::Subscriber armSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
-
-	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
-
-	if (debugEnabled)
-	{
-		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
-			ros::console::notifyLoggerLevelsChanged();
-
-		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
-		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
-	}
+	// effector->setNumPlanningAttempts(3);
 
 
 	/********** Set services **********/
@@ -500,7 +487,26 @@ int main(int _argn, char **_argv)
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
 		ros::Duration(0.5).sleep();
 	}
-	ROS_INFO("Setup done");
+
+
+	/********** Set subscriptions/publishers **********/
+	ROS_INFO("Setting publishers/subscribers");
+	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
+	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
+
+	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
+	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
+
+	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
+
+	if (debugEnabled)
+	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
+
+		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
+		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
+	}
 
 
 	ros::waitForShutdown();

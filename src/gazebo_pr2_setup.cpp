@@ -138,7 +138,8 @@ void moveHead()
 
 	RobotUtils::moveHead(Config::get()["setup"]["headTarget"]["x"].as<float>(0.9),
 						 Config::get()["setup"]["headTarget"]["y"].as<float>(0),
-						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5));
+						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5),
+						 FRAME_BASE);
 
 	ROS_INFO("...head moved");
 }
