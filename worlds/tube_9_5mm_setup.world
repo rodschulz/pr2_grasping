@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://tube_9_5mm</uri>
 			<name>tube_9_5mm</name>
-			<pose>0.75 0 0.634659 -0.000014 -0.000024 0.000814</pose>
+			<pose>0.75 0.0 0.469659 -0.000014 -0.000028 0.000574</pose>
 		</include>
 
 		<!-- Shadows disabled -->
