@@ -24,10 +24,8 @@ setup:
       right: {x: 0.0, y: -0.7, z: 0.9}
       left: {x: 0.0, y: 0.7, z: 0.9}
 
-    # reset target config
-    type: reset # reset or respawn
+    # objects ignored in the reset process
     ignore: [ground_plane, low_table, pr2]
-    modelsFile: models_locations.yaml
 
 
 ##### labeler node options #####

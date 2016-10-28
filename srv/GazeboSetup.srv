@@ -1,5 +1,5 @@
-# Indicates that target object's pose has to be reset (true) or not (false)
-bool resetObject
 ---
-# Indicates if the setup routine was performed successfully (true) or not (false)
+# Indicates if the setup was performed successfully (true) or not (false)
 bool result
+# List of objects reseted to its original state
+string[] objects

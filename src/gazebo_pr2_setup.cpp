@@ -20,12 +20,10 @@
 
 
 /***** Global variables *****/
-bool respawn = false;
 bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
 std::pair<std::string, geometry_msgs::Pose> state;
-YAML::Node models;
 MoveGroupPtr arms;
 
 
@@ -177,40 +175,13 @@ void retrieveWorldState()
 /**************************************************/
 bool resetObject()
 {
+	ROS_INFO("Reseting target object state");
+
 	bool resetOk = true;
-
-	if (respawn)
+	if (!GazeboUtils::setModelState(state.first, state.second, "world"))
 	{
-		ROS_INFO("Respawning target object");
-
-		size_t n = state.first.find_last_of(':');
-		std::string root = state.first.substr(0, n);
-		int spawns = n == std::string::npos ? 0 : boost::lexical_cast<int>(state.first.substr(n + 1));
-
-		ROS_INFO_STREAM("Deleting model " << state.first);
-		if (!GazeboUtils::deleteModel(state.first))
-		{
-			ROS_WARN_STREAM("Can't delete model '" << state.first << "'");
-			resetOk = false;
-		}
-
-		state.first = root + ":" + boost::lexical_cast<std::string>(spawns + 1);
-		ROS_INFO_STREAM("Spawning model " << state.first);
-		if (!GazeboUtils::spawnModel(state.first, models["models"][root].as<std::string>(), state.second))
-		{
-			ROS_WARN_STREAM("Can't spawn model '" << state.first << "'");
-			resetOk = false;
-		}
-	}
-	else
-	{
-		ROS_INFO("Reseting target object state");
-
-		if (!GazeboUtils::setModelState(state.first, state.second, "world"))
-		{
-			ROS_WARN_STREAM("Can't reset state of model '" << state.first << "'");
-			resetOk = false;
-		}
+		ROS_WARN_STREAM("Can't reset state of model '" << state.first << "'");
+		resetOk = false;
 	}
 
 	return resetOk;
@@ -236,14 +207,10 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 	if (Config::get()["setup"]["moveHead"].as<bool>())
 		moveHead();
 
-	bool respawnOk = true;
-	if (request_.resetObject)
-		respawnOk = resetObject();
+	bool resetOk = resetObject();
 
-
-	response_.result = respawnOk && armsOk;
+	response_.result = resetOk && armsOk;
 	ROS_INFO("Setup routine %s...", response_.result ? "SUCCESSFUL" : "FAILED");
-
 
 	return true;
 }
@@ -268,8 +235,6 @@ int main(int argn_, char** argv_)
 
 	bool debugEnabled = Config::get()["setupDebug"].as<bool>();
 	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>();
-	respawn = boost::iequals("respawn", Config::get()["setup"]["type"].as<std::string>());
-	models = YAML::LoadFile(ros::package::getPath(PACKAGE_NAME) + "/config/" + Config::get()["setup"]["modelsFile"].as<std::string>());
 
 	if (debugEnabled)
 	{

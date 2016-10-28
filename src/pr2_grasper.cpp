@@ -208,6 +208,16 @@ void releaseObject(MoveGroupPtr &effector_)
 
 
 /**************************************************/
+void saveResult(const std::string object_,
+				const moveit_msgs::Grasp &grasp_,
+				const moveit::planning_interface::MoveItErrorCode &errCode_,
+				const bool success_)
+{
+
+}
+
+
+/**************************************************/
 void timerCallback(const ros::TimerEvent &event_,
 				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
 				   MoveGroupPtr &effector_,
@@ -249,7 +259,7 @@ void timerCallback(const ros::TimerEvent &event_,
 		dimX = 1.5;
 		dimY = 0.82;
 		dimZ = 0.46;
-		geometry_msgs::Pose supportPose = GraspingUtils::genPose(1.35, 0, 0.23);
+		geometry_msgs::Pose supportPose = GraspingUtils::genPose(1.35, 0, 0.235);
 		moveit_msgs::CollisionObject supportCollision = genCollisionObject(OBJECT_SUPPORT, FRAME_BASE, supportPose, dimX, dimY, dimZ);
 
 
@@ -295,6 +305,21 @@ void timerCallback(const ros::TimerEvent &event_,
 			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 
+
+			// REVISAR SI USAR EL REGISTERED POINTS EN VEZ DEL OTRO getGripperTopic
+
+
+
+			// ROS_INFO("TEST ATTACH");
+			// effector_->attachObject(OBJECT_TARGET);
+			// ros::Duration(3.0).sleep();
+			// ROS_INFO("TEST DETACH");
+			// effector_->detachObject(OBJECT_TARGET);
+			// ros::Duration(3.0).sleep();
+			// continue;
+
+
+
 			/********** STAGE 2.4: attempt grasp **********/
 			ROS_INFO("...attempting grasp");
 			std::vector<moveit_msgs::Grasp> grasps;
@@ -309,10 +334,6 @@ void timerCallback(const ros::TimerEvent &event_,
 			int maxAttempts = 10;
 			int counter = 0;
 			moveit::planning_interface::MoveItErrorCode code;
-			// while ((code.val == 0 ||
-			// 		code.val == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
-			// 		code.val == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN) &&
-			// 		counter++ < 10)
 			while (code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
 					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
 					counter++ < maxAttempts)
@@ -324,18 +345,37 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 			// Skip the rest if the planning failed
-			// TIMED_OUT
-			// if (code.val != moveit_msgs::MoveItErrorCodes::PLANNING_FAILED &&
-			// 		code.val != moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
 			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
 					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
 			{
+				// Detach previous to evaluation
+				ROS_INFO("...detaching object for evaluation");
+				effector_->detachObject(OBJECT_TARGET);
+				ros::Duration(0.5).sleep();
+
 				/********** STAGE 2.5: check the grasping attempt result **********/
 				ROS_INFO("...evaluating result");
 				pr2_grasping::GraspEvaluator srv;
-				if (ros::service::call("/pr2_grasping/grasp_evaluator", srv))
-					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+					ros::Duration(0.5).sleep();
+
+				saveResult("", grasp, code, srv.response.result);
+
+				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 				ros::Duration(0.5).sleep();
+
+				// Re-attach object to allow movements
+				ROS_INFO("...re-attaching object");
+				effector_->attachObject(OBJECT_TARGET);
+				ros::Duration(0.5).sleep();
+
+
+
+				// PROBAR SI EL ATTACH Y DETACH FUNCIONA PARA MOSTRAR LA NUBE FILTRADA
+				// Y PODER MOVER EL OBJETO
+				// PROBAR USANDO EL CORDLESS_DRILL O EL TUBITO DELGADO!
+
+
 
 
 				/********** STAGE 2.6: release the object **********/
@@ -368,7 +408,6 @@ void timerCallback(const ros::TimerEvent &event_,
 			/********** STAGE 2.8: restore the testing setup **********/
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
-			setup.request.resetObject = true;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
 				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
 			ros::Duration(0.5).sleep();
@@ -464,7 +503,6 @@ int main(int _argn, char **_argv)
 	effector->setEndEffector(effectorNames.second);
 	effector->setPlannerId("RRTConnectkConfigDefault");
 	effector->allowReplanning(true);
-	// effector->setNumPlanningAttempts(3);
 
 
 	/********** Set services **********/
@@ -479,7 +517,6 @@ int main(int _argn, char **_argv)
 
 	ROS_INFO("Calling setup service");
 	pr2_grasping::GazeboSetup srv;
-	srv.request.resetObject = true;
 	srv.response.result = false;
 	while (!srv.response.result)
 	{
