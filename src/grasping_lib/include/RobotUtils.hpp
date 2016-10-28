@@ -22,7 +22,8 @@ enum Effector
 
 
 /***** Robot interesting frames *****/
-#define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
+// #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
+// #define FRAME_KINNECT		"head_mount_kinect_ir_link"
 #define FRAME_BASE			"base_footprint"
 #define FRAME_R_GRIPPER		"r_gripper_tool_frame"
 #define FRAME_L_GRIPPER		"l_gripper_tool_frame"

@@ -1,3 +1,4 @@
+output/*
 proj/*
 *.pyc
 test_node.py
