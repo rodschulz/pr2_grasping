@@ -11,8 +11,13 @@
 
 
 #define PACKAGE_NAME		"pr2_grasping"
-#define CONFIG_DIR			"config/"
-#define CONFIG_LOCATION		CONFIG_DIR "config.yaml"
+#define PKG_CONFIG_DIR		"config"
+#define PKG_OUTPUT_DIR		"output"
+
+
+#define OBJECT_TARGET		"object_target"
+#define OBJECT_SUPPORT		"object_support"
+#define GRASP_ID			"grasp_target"
 
 
 // Axis definition for the cloud clipping methods
@@ -30,6 +35,9 @@ class GraspingUtils
 public:
 	/**************************************************/
 	static std::string getConfigPath();
+
+	/**************************************************/
+	static std::string getOutputPath();
 
 	/**************************************************/
 	static bool getTransformation(tf::StampedTransform &transform_,
@@ -66,6 +74,10 @@ public:
 									   const float dirx_ = 1,
 									   const float diry_ = 0,
 									   const float dirz_ = 0);
+
+	/**************************************************/
+	static std::string getTimestamp(const std::string &format_);
+
 
 private:
 	// Constructor

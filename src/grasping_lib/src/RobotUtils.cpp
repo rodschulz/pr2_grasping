@@ -166,7 +166,7 @@ void RobotUtils::moveHead(const float x_,
 
 	ROS_INFO("...sending head goal");
 	headClient->sendGoal(goal);
-	headClient->waitForResult(ros::Duration(60));
+	headClient->waitForResult(ros::Duration(30));
 }
 
 float RobotUtils::getPR2GripperJointOpening(const float gap_)

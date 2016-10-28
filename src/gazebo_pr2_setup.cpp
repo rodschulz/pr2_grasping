@@ -24,6 +24,7 @@ bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
 std::pair<std::string, geometry_msgs::Pose> state;
+std::vector<std::string> objectNames;
 MoveGroupPtr arms;
 
 
@@ -165,8 +166,11 @@ void retrieveWorldState()
 	for (std::map<std::string, geometry_msgs::Pose>::const_iterator it = initState.begin(); it != initState.end(); it++)
 	{
 		ROS_INFO_STREAM("..." << it->first);
+		objectNames.push_back(it->first);
+
 		state.first = it->first;
 		state.second = it->second;
+
 		break;
 	}
 }
@@ -210,6 +214,7 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 	bool resetOk = resetObject();
 
 	response_.result = resetOk && armsOk;
+	response_.objects = objectNames;
 	ROS_INFO("Setup routine %s...", response_.result ? "SUCCESSFUL" : "FAILED");
 
 	return true;

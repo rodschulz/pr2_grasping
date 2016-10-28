@@ -7,14 +7,26 @@
 #include <pcl/filters/plane_clipper3D.h>
 #include <pcl/filters/impl/plane_clipper3D.hpp>
 #include <pcl/filters/voxel_grid.h>
+#include <ctime>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
+
+
+#define TIMESTAMP_BUFFER_SIZE	100
+#define CONFIG_LOCATION			PKG_CONFIG_DIR "/config.yaml"
 
 
 std::string GraspingUtils::getConfigPath()
 {
 	std::string packagePath = ros::package::getPath(PACKAGE_NAME);
 	std::string fullpath = packagePath + "/" + CONFIG_LOCATION;
+	return fullpath;
+}
+
+std::string GraspingUtils::getOutputPath()
+{
+	std::string packagePath = ros::package::getPath(PACKAGE_NAME);
+	std::string fullpath = packagePath + "/" + PKG_OUTPUT_DIR + "/";
 	return fullpath;
 }
 
@@ -162,4 +174,18 @@ geometry_msgs::Pose GraspingUtils::genPose(const float x_,
 	pose.orientation.z = p.z() * sin(theta_ / 2);
 
 	return pose;
+}
+
+std::string GraspingUtils::getTimestamp(const std::string &format_)
+{
+	time_t rawtime;
+	time (&rawtime);
+
+	struct tm *timeinfo;
+	timeinfo = localtime(&rawtime);
+
+	char timestamp[TIMESTAMP_BUFFER_SIZE];
+	strftime(timestamp, TIMESTAMP_BUFFER_SIZE, format_.c_str(), timeinfo);
+
+	return std::string(timestamp);
 }
