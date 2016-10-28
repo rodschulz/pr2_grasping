@@ -18,14 +18,12 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <shape_tools/solid_primitive_dims.h>
 #include <deque>
+#include <iostream>
+#include <fstream>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
 #include "RobotUtils.hpp"
-
-
-#define OBJECT_TARGET		"object_target"
-#define OBJECT_SUPPORT		"object_support"
-#define GRASP_ID			"grasp_target"
+#include "IO.hpp"
 
 
 enum GripperState
@@ -43,6 +41,7 @@ unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
+std::vector<std::string> objects;
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -208,12 +207,32 @@ void releaseObject(MoveGroupPtr &effector_)
 
 
 /**************************************************/
-void saveResult(const std::string object_,
-				const moveit_msgs::Grasp &grasp_,
+void saveResult(const moveit_msgs::Grasp &grasp_,
 				const moveit::planning_interface::MoveItErrorCode &errCode_,
-				const bool success_)
+				const bool success_,
+				const std::vector<std::string> &objects_)
 {
+	std::string filename = GraspingUtils::getOutputPath() +
+						   "grasp_" +
+						   GraspingUtils::getTimestamp("%d-%m-%Y_%H:%M:%S") + ".yaml";
 
+	ROS_DEBUG_STREAM("Saving to: " << filename);
+
+	// generate a YAML file with the results
+	YAML::Emitter emitter;
+	emitter << YAML::BeginMap
+			<< YAML::Key << "success" << YAML::Value << success_
+			<< YAML::Key << "code" << YAML::Value << errCode_.val
+			<< YAML::Key << "objects" << YAML::Value <<  objects_
+			<< YAML::Key << "grasp" << YAML::Value << grasp_
+			<< YAML::EndMap;
+
+	std::ofstream output;
+	output.open(filename.c_str(), std::fstream::out);
+	output << emitter.c_str();
+	output.close();
+
+	ROS_INFO("...saved");
 }
 
 
@@ -310,16 +329,6 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 
-			// ROS_INFO("TEST ATTACH");
-			// effector_->attachObject(OBJECT_TARGET);
-			// ros::Duration(3.0).sleep();
-			// ROS_INFO("TEST DETACH");
-			// effector_->detachObject(OBJECT_TARGET);
-			// ros::Duration(3.0).sleep();
-			// continue;
-
-
-
 			/********** STAGE 2.4: attempt grasp **********/
 			ROS_INFO("...attempting grasp");
 			std::vector<moveit_msgs::Grasp> grasps;
@@ -339,6 +348,7 @@ void timerCallback(const ros::TimerEvent &event_,
 					counter++ < maxAttempts)
 			{
 				code = effector_->pick(OBJECT_TARGET, grasps);
+				// effector_->attachObject(OBJECT_TARGET);
 				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
 				ros::Duration(1).sleep();
 			}
@@ -348,7 +358,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
 					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
 			{
-				// Detach previous to evaluation
+				// Detach so the object can be 'seen'
 				ROS_INFO("...detaching object for evaluation");
 				effector_->detachObject(OBJECT_TARGET);
 				ros::Duration(0.5).sleep();
@@ -359,28 +369,21 @@ void timerCallback(const ros::TimerEvent &event_,
 				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
 					ros::Duration(0.5).sleep();
 
-				saveResult("", grasp, code, srv.response.result);
+
+				// Store the result of the grasping attempt
+				saveResult(grasp, code, srv.response.result, objects);
+
 
 				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 				ros::Duration(0.5).sleep();
 
 				// Re-attach object to allow movements
-				ROS_INFO("...re-attaching object");
-				effector_->attachObject(OBJECT_TARGET);
-				ros::Duration(0.5).sleep();
-
-
-
-				// PROBAR SI EL ATTACH Y DETACH FUNCIONA PARA MOSTRAR LA NUBE FILTRADA
-				// Y PODER MOVER EL OBJETO
-				// PROBAR USANDO EL CORDLESS_DRILL O EL TUBITO DELGADO!
-
-
-
+				// ROS_INFO("...re-attaching object");
+				// effector_->attachObject(OBJECT_TARGET);
+				// ros::Duration(0.5).sleep();
 
 				/********** STAGE 2.6: release the object **********/
-				/** This MUST be done before restoring the setup, otherwise the
-				robot gets moved when the object's position is reseted **/
+				// This MUST be done before restoring, otherwise the robot is also moved
 				ROS_INFO("...releasing object");
 				releaseObject(effector_);
 				ros::Duration(0.5).sleep();
@@ -524,6 +527,7 @@ int main(int _argn, char **_argv)
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
 		ros::Duration(0.5).sleep();
 	}
+	objects = srv.response.objects;
 
 
 	/********** Set subscriptions/publishers **********/
