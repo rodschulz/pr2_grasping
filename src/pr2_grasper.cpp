@@ -324,11 +324,6 @@ void timerCallback(const ros::TimerEvent &event_,
 			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 
-
-			// REVISAR SI USAR EL REGISTERED POINTS EN VEZ DEL OTRO getGripperTopic
-
-
-
 			/********** STAGE 2.4: attempt grasp **********/
 			ROS_INFO("...attempting grasp");
 			std::vector<moveit_msgs::Grasp> grasps;
@@ -348,7 +343,6 @@ void timerCallback(const ros::TimerEvent &event_,
 					counter++ < maxAttempts)
 			{
 				code = effector_->pick(OBJECT_TARGET, grasps);
-				// effector_->attachObject(OBJECT_TARGET);
 				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
 				ros::Duration(1).sleep();
 			}
@@ -369,10 +363,8 @@ void timerCallback(const ros::TimerEvent &event_,
 				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
 					ros::Duration(0.5).sleep();
 
-
 				// Store the result of the grasping attempt
 				saveResult(grasp, code, srv.response.result, objects);
-
 
 				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 				ros::Duration(0.5).sleep();
