@@ -1,9 +1,6 @@
 <launch>
-	<!-- start up empty world -->
 	<arg name="gui" default="true"/>
 	<arg name="paused" default="false"/>
-
-	<!-- use this argument to use different worlds for the experimental setup -->
 	<arg name="world" default="thin_beer"/>
 
 	<!-- launch ros core and world setup -->

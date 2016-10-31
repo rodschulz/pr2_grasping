@@ -1,0 +1,3 @@
+<launch>
+	<node name="pr2_grasper" pkg="pr2_grasping" type="pr2_grasper" output="screen" respawn="true"/>
+</launch>
