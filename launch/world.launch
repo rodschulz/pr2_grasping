@@ -3,6 +3,10 @@
 	<arg name="gui" default="true"/>
 	<arg name="paused" default="false"/>
 
+	<!-- set necessary environment variables -->
+	<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
+	<env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find pr2_grasping)/models" />
+
 	<!-- use this argument to use different worlds for the experimental setup -->
 	<arg name="world" default="thin_beer"/>
 

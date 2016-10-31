@@ -3,8 +3,7 @@
 	<arg name="paused" default="false"/>
 	<arg name="world" default="thin_beer"/>
 
-	<!-- set DISPLAY environment variable, so remote sessions work -->
-	<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
+	<env name="ROSCONSOLE_FORMAT" value="[${severity}][${node}]: ${message}" />
 
 	<!-- launch the base nodes -->
 	<include file="$(find pr2_grasping)/launch/base.launch">
