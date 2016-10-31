@@ -1,9 +1,5 @@
 <launch>
 	<node name="gazebo_pr2_setup" pkg="pr2_grasping" type="gazebo_pr2_setup" output="screen" respawn="true"/>
-
 	<node name="pr2_grasp_evaluator" pkg="pr2_grasping" type="pr2_grasp_evaluator" output="screen" respawn="true"/>
-
 	<node name="gripper_monitor" pkg="pr2_grasping" type="gripper_monitor" output="screen" respawn="true"/>
-
-	<!-- <node name="arm_monitor" pkg="pr2_grasping" type="arm_monitor" output="screen" respawn="true"/> -->
 </launch>
