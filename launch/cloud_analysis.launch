@@ -1,5 +1,4 @@
 <launch>
 	<node name="pr2_cloud_labeler" pkg="pr2_grasping" type="pr2_cloud_labeler" output="screen" respawn="true"/>
-
 	<node name="pr2_cluster_analyzer" pkg="pr2_grasping" type="pr2_cluster_analyzer.py" output="screen" respawn="true"/>
 </launch>

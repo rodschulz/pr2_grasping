@@ -1,5 +1,5 @@
 <launch>
-	<arg name="gui" default="true"/>
+	<arg name="gui" default="false"/>
 	<arg name="paused" default="false"/>
 	<arg name="world" default="thin_beer"/>
 

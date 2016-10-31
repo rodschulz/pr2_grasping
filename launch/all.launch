@@ -1,7 +1,10 @@
 <launch>
-	<arg name="gui" default="true"/>
+	<arg name="gui" default="false"/>
 	<arg name="paused" default="false"/>
 	<arg name="world" default="thin_beer"/>
+
+	<!-- set DISPLAY environment variable, so remote sessions work -->
+	<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
 
 	<!-- launch the base nodes -->
 	<include file="$(find pr2_grasping)/launch/base.launch">
