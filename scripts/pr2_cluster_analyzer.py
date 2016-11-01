@@ -22,6 +22,23 @@ debug = False
 
 
 ##################################################
+def filterByStd(data):
+	av = np.average(data, axis=0)
+	std = np.std(data, axis=0)
+
+	filtered = None
+	for d in data:
+		dx = abs(d[0] - av[0])
+		dy = abs(d[1] - av[1])
+		if dx <= std[0] and dy <= std[1]:
+			if filtered == None:
+				filtered = np.array([d])
+			else:
+				filtered = np.concatenate((filtered, [d]), axis=0)
+
+	return filtered
+
+##################################################
 def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 	points = []
 
@@ -37,7 +54,9 @@ def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 		rp.loginfo('.......cluster size: %d pts', len(pts))
 
 		position = np.average(pts, axis=0)
-		normal = np.average(normals_[clusteringLabels_ == cls], axis=0)
+		# normal = np.average(normals_[clusteringLabels_ == cls], axis=0)
+		filteredNormals = filterByStd(normals_[clusteringLabels_ == cls])
+		normal = np.average(filteredNormals, axis=0)
 
 		point = GraspingPoint()
 		point.header.frame_id = frameId_
