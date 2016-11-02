@@ -128,7 +128,6 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 /**************************************************/
 moveit_msgs::Grasp genGrasp(const std::string &graspId_,
-							const std::string &referenceFrame_,
 							const geometry_msgs::PoseStamped &graspingPose_,
 							const std::string &objectTarget_,
 							const std::string &objectSupport_)
@@ -159,7 +158,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
-	grasp.post_grasp_retreat.direction.header.frame_id = referenceFrame_;
+	grasp.post_grasp_retreat.direction.header.frame_id = FRAME_BASE;
 	grasp.post_grasp_retreat.direction.vector.x = 0;
 	grasp.post_grasp_retreat.direction.vector.y = 0;
 	grasp.post_grasp_retreat.direction.vector.z = 1;
@@ -321,7 +320,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 			/********** STAGE 2.3: synthesize grasp **********/
 			ROS_INFO("...synthesizing grasp");
-			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, FRAME_BASE, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 
 			/********** STAGE 2.4: attempt grasp **********/
