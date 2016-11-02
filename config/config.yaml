@@ -30,7 +30,7 @@ setup:
 
 ##### labeler node options #####
 labeler:
-    # point cloud input topic (/head_mount_kinect/depth/points or /move_group/filtered_cloud)
+    # point cloud input topic
     pointcloudTopic: /head_mount_kinect/depth_registered/points
     # sampling voxel size
     voxelSize: 0.004
@@ -75,7 +75,7 @@ evaluator:
     maxRetries: 30
     # object position for evaluation of grasping attempt (relative to 'base_footprint')
     position: {x: 0.45, y: 0, z: 0.8}
-    # point cloud input topic (/head_mount_kinect/depth/points or /move_group/filtered_cloud)
+    # point cloud input topic
     pointcloudTopic: /move_group/filtered_cloud 
 
 ########## descriptor params ##########
