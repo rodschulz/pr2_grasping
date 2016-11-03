@@ -46,7 +46,7 @@ unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
-std::vector<std::string> objects;
+std::string gazeboTargetName = "";
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -258,13 +258,15 @@ void releaseObject(MoveGroupPtr &effector_,
 
 
 /**************************************************/
-void saveResult(const moveit_msgs::Grasp &grasp_,
-				const moveit::planning_interface::MoveItErrorCode &errCode_,
+void saveResult(const std::string &targetObject_,
 				const bool success_,
-				const std::vector<std::string> &objects_)
+				const int label_,
+				const float angle_,
+				const moveit_msgs::Grasp &grasp_,
+				const moveit::planning_interface::MoveItErrorCode &errCode_)
 {
 	std::string filename = GraspingUtils::getOutputPath() +
-						   "grasp_" +
+						   targetObject_ + "_" +
 						   GraspingUtils::getTimestamp("%d-%m-%Y_%H:%M:%S") + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
@@ -272,9 +274,22 @@ void saveResult(const moveit_msgs::Grasp &grasp_,
 	// generate a YAML file with the results
 	YAML::Emitter emitter;
 	emitter << YAML::BeginMap
+			<< YAML::Key << "target_object" << YAML::Value <<  targetObject_
+			<< YAML::Key << "cluster_label" << YAML::Value << label_
+
+			<< YAML::Key << "result"
+			<< YAML::BeginMap
 			<< YAML::Key << "success" << YAML::Value << success_
-			<< YAML::Key << "code" << YAML::Value << errCode_.val
-			<< YAML::Key << "objects" << YAML::Value <<  objects_
+			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
+			<< YAML::EndMap
+
+			<< YAML::Key << "orientation"
+			<< YAML::BeginMap
+			<< YAML::Key << "angle" << YAML::Value << angle_
+			<< YAML::Key << "split_number" << YAML::Value << ANGLE_SPLIT_NUM
+			<< YAML::Key << "angle_step" << YAML::Value << ANGLE_STEP
+			<< YAML::EndMap
+
 			<< YAML::Key << "grasp" << YAML::Value << grasp_
 			<< YAML::EndMap;
 
@@ -351,7 +366,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
 			{
 				ROS_INFO("### using angle %d of %d ###", j + 1, ANGLE_SPLIT_NUM);
-				float angle = j + ANGLE_STEP;
+				float angle = j * ANGLE_STEP;
 
 
 				/********** STAGE 2.1: add collisions to the scene **********/
@@ -425,7 +440,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 
 					// Store the result of the grasping attempt
-					saveResult(grasp, code, srv.response.result, objects);
+					saveResult(gazeboTargetName, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
 					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 					ros::Duration(0.5).sleep();
 
@@ -577,7 +592,7 @@ int main(int _argn, char **_argv)
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
 		ros::Duration(1.0).sleep();
 	}
-	objects = srv.response.objects;
+	gazeboTargetName = srv.response.trackedObject;
 
 
 	/********** Set subscriptions/publishers **********/
