@@ -26,6 +26,9 @@
 #include "IO.hpp"
 
 
+#define OBJECT_FAKE_AUX		"object_fake_aux"
+
+
 enum GripperState
 {
 	STATE_IDLE,
@@ -128,6 +131,7 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 /**************************************************/
 moveit_msgs::Grasp genGrasp(const std::string &graspId_,
+							const EffectorSide &side_,
 							const geometry_msgs::PoseStamped &graspingPose_,
 							const std::string &objectTarget_,
 							const std::string &objectSupport_)
@@ -136,7 +140,9 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.id = graspId_;
 	grasp.grasp_pose = graspingPose_;
 
-	grasp.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
+	std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
+
+	grasp.pre_grasp_approach.direction.header.frame_id = prefix + "_wrist_roll_link";
 	grasp.pre_grasp_approach.direction.vector.x = 1;
 	grasp.pre_grasp_approach.direction.vector.y = 0;
 	grasp.pre_grasp_approach.direction.vector.z = 0;
@@ -144,14 +150,14 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.pre_grasp_approach.desired_distance = 0.15;
 
 
-	grasp.pre_grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+	grasp.pre_grasp_posture.joint_names.resize(1, prefix + "_gripper_motor_screw_joint");
 	grasp.pre_grasp_posture.points.resize(1);
 	grasp.pre_grasp_posture.points[0].positions.resize(1);
 	grasp.pre_grasp_posture.points[0].positions[0] = 1;
 	grasp.pre_grasp_posture.points[0].time_from_start = ros::Duration(45.0);
 
 
-	grasp.grasp_posture.joint_names.resize(1, "r_gripper_motor_screw_joint");
+	grasp.grasp_posture.joint_names.resize(1, prefix + "_gripper_motor_screw_joint");
 	grasp.grasp_posture.points.resize(1);
 	grasp.grasp_posture.points[0].positions.resize(1);
 	grasp.grasp_posture.points[0].positions[0] = 0;
@@ -174,13 +180,32 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 
 
 /**************************************************/
-void releaseObject(MoveGroupPtr &effector_)
+void releaseObject(MoveGroupPtr &effector_,
+				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
+				   const EffectorSide &side_)
 {
 	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
 		ros::console::notifyLoggerLevelsChanged();
 
 	// Stop any previous movement
 	effector_->stop();
+
+	ROS_INFO(".....setting aux collision");
+	std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
+	std::vector<std::string> allowedTouch;
+	allowedTouch.push_back(prefix + "_wrist_roll_link");
+	allowedTouch.push_back(prefix + "_gripper_palm_link");
+	allowedTouch.push_back(prefix + "_gripper_r_finger_link");
+	allowedTouch.push_back(prefix + "_gripper_r_finger_tip_link");
+	allowedTouch.push_back(prefix + "_gripper_l_finger_link");
+	allowedTouch.push_back(prefix + "_gripper_l_finger_tip_link");
+
+	std::vector<moveit_msgs::CollisionObject> collisions;
+	collisions.push_back(genCollisionObject(OBJECT_FAKE_AUX, FRAME_R_GRIPPER, geometry_msgs::Pose(), 0.25, 0.25, 0.25));
+	planningScene_->addCollisionObjects(collisions);
+	effector_->attachObject(OBJECT_FAKE_AUX, "", allowedTouch);
+	ros::Duration(0.5).sleep();
+
 
 	// Move the effector to an adequate pose to release the object
 	ROS_INFO(".....moving effector to release pose");
@@ -199,7 +224,21 @@ void releaseObject(MoveGroupPtr &effector_)
 	if (!RobotUtils::move(effector_, 25))
 		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
 
+
+	ROS_INFO(".....detaching aux collision");
+	effector_->detachObject(OBJECT_FAKE_AUX);
+	ros::Duration(0.5).sleep();
+
+	ROS_INFO(".....removing aux collision");
+	std::vector<std::string> ids;
+	ids.push_back(OBJECT_FAKE_AUX);
+	planningScene_->removeCollisionObjects(ids);
+	ros::Duration(0.5).sleep();
+
+
+	ROS_INFO(".....opening gripper");
 	RobotUtils::moveGripper(effector_->getName(), 1);
+
 
 	ROS_INFO("Release action completed");
 }
@@ -239,7 +278,7 @@ void saveResult(const moveit_msgs::Grasp &grasp_,
 void timerCallback(const ros::TimerEvent &event_,
 				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
 				   MoveGroupPtr &effector_,
-				   tf::TransformListener *tfListener_,
+				   const EffectorSide &side_,
 				   const bool debugEnabled_)
 {
 	while (!queue.empty())
@@ -298,7 +337,7 @@ void timerCallback(const ros::TimerEvent &event_,
 			/********** STAGE 2.1: add collisions to the scene **********/
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
-			ros::Duration(2.0).sleep();
+			ros::Duration(0.5).sleep();
 
 
 			/********** STAGE 2.2: generate grasping pose **********/
@@ -320,7 +359,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 			/********** STAGE 2.3: synthesize grasp **********/
 			ROS_INFO("...synthesizing grasp");
-			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+			moveit_msgs::Grasp grasp = genGrasp(GRASP_ID, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 
 			/********** STAGE 2.4: attempt grasp **********/
@@ -356,27 +395,24 @@ void timerCallback(const ros::TimerEvent &event_,
 				effector_->detachObject(OBJECT_TARGET);
 				ros::Duration(0.5).sleep();
 
+
 				/********** STAGE 2.5: check the grasping attempt result **********/
 				ROS_INFO("...evaluating result");
 				pr2_grasping::GraspEvaluator srv;
 				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
 					ros::Duration(0.5).sleep();
 
+
 				// Store the result of the grasping attempt
 				saveResult(grasp, code, srv.response.result, objects);
-
 				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 				ros::Duration(0.5).sleep();
 
-				// Re-attach object to allow movements
-				// ROS_INFO("...re-attaching object");
-				// effector_->attachObject(OBJECT_TARGET);
-				// ros::Duration(0.5).sleep();
 
 				/********** STAGE 2.6: release the object **********/
 				// This MUST be done before restoring, otherwise the robot is also moved
 				ROS_INFO("...releasing object");
-				releaseObject(effector_);
+				releaseObject(effector_, planningScene_, side_);
 				ros::Duration(0.5).sleep();
 			}
 			else
@@ -468,7 +504,6 @@ int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
 	ros::NodeHandle handler;
-	tf::TransformListener *tfListener = new tf::TransformListener(ros::Duration(10.0));
 	moveit::planning_interface::PlanningSceneInterface planningScene;
 
 
@@ -492,6 +527,7 @@ int main(int _argn, char **_argv)
 	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
 	std::string arm = Config::get()["grasper"]["arm"].as<std::string>();
+	EffectorSide side = RobotUtils::getEffectorSide(arm);
 	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(arm);
 	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
 	effector->setEndEffector(effectorNames.second);
@@ -507,7 +543,7 @@ int main(int _argn, char **_argv)
 	/********** Setup the robot and environment **********/
 	std::string serviceName = "/pr2_grasping/gazebo_setup";
 	while (!ros::service::waitForService(serviceName, ros::Duration(1)))
-		ros::Duration(0.5).sleep();
+		ros::Duration(1.0).sleep();
 
 	ROS_INFO("Calling setup service");
 	pr2_grasping::GazeboSetup srv;
@@ -516,7 +552,7 @@ int main(int _argn, char **_argv)
 	{
 		if (ros::service::call(serviceName, srv))
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
-		ros::Duration(0.5).sleep();
+		ros::Duration(1.0).sleep();
 	}
 	objects = srv.response.objects;
 
@@ -529,7 +565,7 @@ int main(int _argn, char **_argv)
 	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
 
-	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, tfListener, debugEnabled));
+	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, side, debugEnabled));
 
 	if (debugEnabled)
 	{
