@@ -14,7 +14,7 @@
 #include <moveit_msgs/PickupAction.h>
 #include <control_msgs/GripperCommandAction.h>
 
-enum Effector
+enum EffectorSide
 {
 	RIGHT_ARM,
 	LEFT_ARM
@@ -22,8 +22,6 @@ enum Effector
 
 
 /***** Robot interesting frames *****/
-// #define FRAME_KINNECT		"head_mount_kinect_ir_optical_frame"
-// #define FRAME_KINNECT		"head_mount_kinect_ir_link"
 #define FRAME_BASE			"base_footprint"
 #define FRAME_R_GRIPPER		"r_gripper_tool_frame"
 #define FRAME_L_GRIPPER		"l_gripper_tool_frame"
@@ -52,7 +50,10 @@ class RobotUtils
 {
 public:
 	/**************************************************/
-	static std::pair<std::string, std::string> getEffectorNames(const Effector &arm_);
+	static EffectorSide getEffectorSide(const std::string &arm_);
+
+	/**************************************************/
+	static std::pair<std::string, std::string> getEffectorNames(const EffectorSide &arm_);
 
 	/**************************************************/
 	static std::pair<std::string, std::string> getEffectorNames(const std::string &arm_);

@@ -5,7 +5,23 @@
 #include "RobotUtils.hpp"
 #include <ros/ros.h>
 
-std::pair<std::string, std::string> RobotUtils::getEffectorNames(const Effector &arm_)
+EffectorSide RobotUtils::getEffectorSide(const std::string &arm_)
+{
+	if (boost::iequals(arm_, "right") || boost::iequals(arm_, "right_arm"))
+		return RIGHT_ARM;
+
+	else if (boost::iequals(arm_, "left") || boost::iequals(arm_, "left_arm"))
+		return LEFT_ARM;
+
+	else
+	{
+		ROS_WARN("Wrong effector type, assuming right arm");
+		return RIGHT_ARM;
+	}
+}
+
+
+std::pair<std::string, std::string> RobotUtils::getEffectorNames(const EffectorSide &arm_)
 {
 	switch (arm_)
 	{

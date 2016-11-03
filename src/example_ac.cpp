@@ -15,7 +15,7 @@
 
 
 /**************************************************/
-void moveArmToPose(const Effector arm_,
+void moveArmToPose(const EffectorSide arm_,
 				   const geometry_msgs::Pose &targetPose_,
 				   const std::string &targetRef_)
 {
