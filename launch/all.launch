@@ -1,19 +1,20 @@
 <launch>
-	<arg name="gui" default="false"/>
-	<arg name="paused" default="false"/>
 	<arg name="world" default="thin_beer"/>
+	<arg name="rviz" default="false"/>
+	<arg name="gui" default="false"/>
 
 	<env name="ROSCONSOLE_FORMAT" value="[${severity}][${node}]: ${message}" />
 
 	<!-- launch the base nodes -->
 	<include file="$(find pr2_grasping)/launch/base.launch">
 		<arg name="world" value="$(arg world)"/>
-		<arg name="gui" value="$(arg gui)"/>
-		<arg name="paused" value="$(arg paused)"/>
 	</include>
 
 	<!-- launch the grasping nodes -->
 	<include file="$(find pr2_grasping)/launch/cloud_analysis.launch"/>
 	<include file="$(find pr2_grasping)/launch/support_services.launch"/>
-	<include file="$(find pr2_grasping)/launch/grasping.launch"/>
+	<include file="$(find pr2_grasping)/launch/grasping.launch">
+		<arg name="rviz" value="$(arg rviz)"/>
+		<arg name="gui" value="$(arg gui)"/>
+	</include>
 </launch>
