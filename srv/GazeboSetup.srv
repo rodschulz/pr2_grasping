@@ -1,5 +1,5 @@
 ---
 # Indicates if the setup was performed successfully (true) or not (false)
 bool result
-# List of objects reseted to its original state
-string[] objects
+# Name of the tracked object by the setup service
+string trackedObject
