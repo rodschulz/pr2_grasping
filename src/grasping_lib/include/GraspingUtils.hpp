@@ -17,7 +17,7 @@
 
 #define OBJECT_TARGET		"object_target"
 #define OBJECT_SUPPORT		"object_support"
-#define GRASP_ID			"grasp_target"
+#define GRASP_ID			"grasp_"
 
 
 // Axis definition for the cloud clipping methods
