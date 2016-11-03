@@ -16,6 +16,11 @@
 #include "Config.hpp"
 
 
+#define TIME_WINDOW			5
+#define POS_STD_THRES		0.0005
+#define EFFORT_STD_THRES	0.2
+
+
 /***** Accumulators type definition *****/
 typedef boost::accumulators::accumulator_set<double, boost::accumulators::stats<boost::accumulators::tag::variance> > AccType;
 
@@ -53,7 +58,7 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 
 
 	ros::Duration elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
-	if (elapsed.toSec() > 3 && posStdDev < 0.0005 && effortStdDev < 0.2)
+	if (elapsed.toSec() > TIME_WINDOW && posStdDev < POS_STD_THRES && effortStdDev < EFFORT_STD_THRES)
 	{
 		std_msgs::Bool stuckMsg;
 		stuckMsg.data = true;
@@ -61,7 +66,7 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 	}
 
 	// Remove old stuff
-	while (elapsed.toSec() > 3)
+	while (elapsed.toSec() > TIME_WINDOW)
 	{
 		feedback.pop_front();
 		acc.pop_front();
