@@ -154,7 +154,8 @@ bool RobotUtils::move(MoveGroupPtr &group_,
 void RobotUtils::moveHead(const float x_,
 						  const float y_,
 						  const float z_,
-						  const std::string &frameId_)
+						  const std::string &frameId_,
+						  const ros::Duration timeout_)
 {
 	// define action client
 	HeadClient *headClient = new HeadClient("/head_traj_controller/point_head_action", true);
@@ -182,7 +183,7 @@ void RobotUtils::moveHead(const float x_,
 
 	ROS_INFO("...sending head goal");
 	headClient->sendGoal(goal);
-	headClient->waitForResult(ros::Duration(30));
+	headClient->waitForResult(timeout_);
 }
 
 float RobotUtils::getPR2GripperJointOpening(const float gap_)

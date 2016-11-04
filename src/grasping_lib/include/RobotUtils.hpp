@@ -79,7 +79,8 @@ public:
 	static void moveHead(const float x_,
 						 const float y_,
 						 const float z_,
-						 const std::string &frameId_);
+						 const std::string &frameId_,
+						 const ros::Duration timeout_ = ros::Duration(30));
 
 	/**************************************************/
 	static float getPR2GripperJointOpening(const float gap_);
