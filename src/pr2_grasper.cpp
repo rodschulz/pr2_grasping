@@ -187,7 +187,16 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.allowed_touch_objects.clear();
 	grasp.allowed_touch_objects.push_back(objectTarget_);
 	grasp.allowed_touch_objects.push_back(objectSupport_);
+	grasp.allowed_touch_objects.push_back(prefix + "_forearm_roll_link");
 	grasp.allowed_touch_objects.push_back(prefix + "_forearm_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_wrist_flex_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_wrist_roll_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_gripper_palm_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_gripper_r_finger_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_gripper_r_finger_tip_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_gripper_l_finger_link");
+	grasp.allowed_touch_objects.push_back(prefix + "_gripper_l_finger_tip_link");
+
 
 	return grasp;
 }
