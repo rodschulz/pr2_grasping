@@ -20,6 +20,9 @@ if(NOT WIN32)
 	set(Cyan 		"${Esc}[36m")
 endif()
 
+## Print the current build config used
+message(STATUS "${Green}...BUILDING TYPE: '${CMAKE_BUILD_TYPE}'${ColorReset}")
+
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
 	message_generation
