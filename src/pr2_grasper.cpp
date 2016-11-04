@@ -46,7 +46,7 @@ unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
-std::string gazeboTargetName = "";
+std::string targetObjectName = "";
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -206,6 +206,9 @@ void releaseObject(MoveGroupPtr &effector_,
 	ROS_INFO(".....setting aux collision");
 	std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
 	std::vector<std::string> allowedTouch;
+	allowedTouch.push_back(prefix + "_forearm_roll_link");
+	allowedTouch.push_back(prefix + "_forearm_link");
+	allowedTouch.push_back(prefix + "_wrist_flex_link");
 	allowedTouch.push_back(prefix + "_wrist_roll_link");
 	allowedTouch.push_back(prefix + "_gripper_palm_link");
 	allowedTouch.push_back(prefix + "_gripper_r_finger_link");
@@ -259,6 +262,7 @@ void releaseObject(MoveGroupPtr &effector_,
 
 /**************************************************/
 void saveResult(const std::string &targetObject_,
+				const bool completed_,
 				const bool success_,
 				const int label_,
 				const float angle_,
@@ -279,6 +283,7 @@ void saveResult(const std::string &targetObject_,
 
 			<< YAML::Key << "result"
 			<< YAML::BeginMap
+			<< YAML::Key << "attempt_completed" << YAML::Value << completed_
 			<< YAML::Key << "success" << YAML::Value << success_
 			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
 			<< YAML::EndMap
@@ -422,10 +427,17 @@ void timerCallback(const ros::TimerEvent &event_,
 				}
 
 
+				// Set default value for the evaluator service message
+				pr2_grasping::GraspEvaluator srv;
+				srv.response.result = false;
+
 				// Skip the rest if the planning failed
+				bool attemptCompleted = false;
 				if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
 						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
 				{
+					attemptCompleted = true;
+
 					// Detach so the object can be 'seen'
 					ROS_INFO("...detaching object for evaluation");
 					effector_->detachObject(OBJECT_TARGET);
@@ -434,13 +446,9 @@ void timerCallback(const ros::TimerEvent &event_,
 
 					/********** STAGE 2.5: check the grasping attempt result **********/
 					ROS_INFO("...evaluating result");
-					pr2_grasping::GraspEvaluator srv;
 					while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
 						ros::Duration(0.5).sleep();
 
-
-					// Store the result of the grasping attempt
-					saveResult(gazeboTargetName, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
 					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 					ros::Duration(0.5).sleep();
 
@@ -456,6 +464,10 @@ void timerCallback(const ros::TimerEvent &event_,
 					ROS_INFO("...attempt failed, skipping evaluation");
 					ros::Duration(0.5).sleep();// little wait to be able to read the message
 				}
+
+
+				// Store the result of the grasping attempt
+				saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
 
 
 				/********** STAGE 2.7: remove collision objects **********/
@@ -592,7 +604,7 @@ int main(int _argn, char **_argv)
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
 		ros::Duration(1.0).sleep();
 	}
-	gazeboTargetName = srv.response.trackedObject;
+	targetObjectName = srv.response.trackedObject;
 
 
 	/********** Set subscriptions/publishers **********/
