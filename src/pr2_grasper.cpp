@@ -39,7 +39,7 @@ enum GripperState
 };
 
 /***** Global variables *****/
-ros::Publisher posePublisher, cancelPublisher;
+ros::Publisher posePublisher, cancelPublisher, scenePublisher;
 boost::mutex pmutex, gmutex;
 std::deque<pr2_grasping::GraspingData> queue;
 unsigned int queueMaxsize = 5;
@@ -187,6 +187,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.allowed_touch_objects.clear();
 	grasp.allowed_touch_objects.push_back(objectTarget_);
 	grasp.allowed_touch_objects.push_back(objectSupport_);
+	grasp.allowed_touch_objects.push_back(prefix + "_forearm_link");
 
 	return grasp;
 }
@@ -219,6 +220,8 @@ void releaseObject(MoveGroupPtr &effector_,
 	std::vector<moveit_msgs::CollisionObject> collisions;
 	collisions.push_back(genCollisionObject(OBJECT_FAKE_AUX, FRAME_R_GRIPPER, geometry_msgs::Pose(), 0.25, 0.2, 0.25));
 	planningScene_->addCollisionObjects(collisions);
+	ros::Duration(1.0).sleep();
+
 	effector_->attachObject(OBJECT_FAKE_AUX, "", allowedTouch);
 	ros::Duration(0.5).sleep();
 
@@ -374,10 +377,16 @@ void timerCallback(const ros::TimerEvent &event_,
 				float angle = j * ANGLE_STEP;
 
 
+				ROS_INFO("...clearing scene");
+				moveit_msgs::PlanningSceneWorld cleanScene;
+				scenePublisher.publish(cleanScene);
+				ros::Duration(2).sleep();
+
+
 				/********** STAGE 2.1: add collisions to the scene **********/
 				ROS_INFO("...adding collisions to scene");
 				planningScene_->addCollisionObjects(collisions);
-				ros::Duration(0.5).sleep();
+				ros::Duration(1.5).sleep();
 
 
 				/********** STAGE 2.2: generate grasping pose **********/
@@ -611,6 +620,7 @@ int main(int _argn, char **_argv)
 	ROS_INFO("Setting publishers/subscribers");
 	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
 	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
+	scenePublisher = handler.advertise<moveit_msgs::PlanningSceneWorld>("/planning_scene_world", 1);
 
 	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
 	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
