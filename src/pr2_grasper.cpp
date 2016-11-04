@@ -39,14 +39,14 @@ enum GripperState
 };
 
 /***** Global variables *****/
-ros::Publisher posePublisher, cancelPublisher, scenePublisher;
+ros::Publisher posePublisher, cancelPublisher, scenePublisher, statusPublisher;
 boost::mutex pmutex, gmutex;
 std::deque<pr2_grasping::GraspingData> queue;
-unsigned int queueMaxsize = 5;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
 std::string targetObjectName = "";
+int runsNumber = -1;
 
 /***** Debug variables *****/
 ros::Publisher collisionPosePublisher, graspingPointPublisher;
@@ -56,7 +56,7 @@ ros::Publisher collisionPosePublisher, graspingPointPublisher;
 void graspingPointsCallback(const pr2_grasping::GraspingDataConstPtr &msg_)
 {
 	// Prevent queue from growing endlessly
-	if (queue.size() < queueMaxsize)
+	if (queue.size() < 1)
 	{
 		ROS_INFO("New points received");
 
@@ -326,6 +326,10 @@ void timerCallback(const ros::TimerEvent &event_,
 				   const EffectorSide &side_,
 				   const bool debugEnabled_)
 {
+	// Track the number of grasping points sets processed so far
+	static int setsProcessed = 0;
+
+	// Process data until empty
 	while (!queue.empty())
 	{
 		ROS_INFO("===== Processing grasping data =====");
@@ -519,6 +523,16 @@ void timerCallback(const ros::TimerEvent &event_,
 		pmutex.lock();
 		queue.pop_front();
 		pmutex.unlock();
+
+
+		// Signalize if
+		setsProcessed++;
+		if (setsProcessed >= runsNumber)
+		{
+			std_msgs::Bool done;
+			done.data = true;
+			statusPublisher.publish(done);
+		}
 	}
 
 	// Call the labeling service if no points are queued
@@ -585,9 +599,9 @@ int main(int _argn, char **_argv)
 	if (!Config::load(GraspingUtils::getConfigPath()))
 		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
 
-	// Get the max allowed size for the message queue
+	// Get the params
+	runsNumber = Config::get()["experiment"]["runsNumber"].as<int>();
 	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
-	queueMaxsize = Config::get()["grasper"]["queueMaxsize"].as<unsigned int>();
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
@@ -627,6 +641,7 @@ int main(int _argn, char **_argv)
 
 	/********** Set subscriptions/publishers **********/
 	ROS_INFO("Setting publishers/subscribers");
+	statusPublisher = handler.advertise<std_msgs::Bool>("/pr2_grasping/experiment_done", 1, true);
 	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
 	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
 	scenePublisher = handler.advertise<moveit_msgs::PlanningSceneWorld>("/planning_scene_world", 1);
@@ -644,6 +659,12 @@ int main(int _argn, char **_argv)
 		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
 		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
 	}
+
+
+	/********** Publish initial status **********/
+	std_msgs::Bool notDone;
+	notDone.data = false;
+	statusPublisher.publish(notDone);
 
 
 	ros::waitForShutdown();
