@@ -389,7 +389,6 @@ void timerCallback(const ros::TimerEvent &event_,
 				ROS_INFO("### using angle %d of %d ###", j + 1, ANGLE_SPLIT_NUM);
 				float angle = j * ANGLE_STEP;
 
-
 				ROS_INFO("...clearing scene");
 				moveit_msgs::PlanningSceneWorld cleanScene;
 				scenePublisher.publish(cleanScene);
@@ -512,8 +511,10 @@ void timerCallback(const ros::TimerEvent &event_,
 					ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
 				ros::Duration(0.5).sleep();
 
+
 				ROS_INFO("### angle %d of %d processed ###", j + 1, ANGLE_SPLIT_NUM);
 			}
+
 
 			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
 		}
@@ -621,6 +622,32 @@ int main(int _argn, char **_argv)
 	ROS_INFO("Starting name query service");
 	ros::ServiceServer nameService = handler.advertiseService<pr2_grasping::GraspingGroup::Request, pr2_grasping::GraspingGroup::Response>("/pr2_grasping/effector_name", boost::bind(queryName, _1, _2, effector));
 
+	/********** Set subscriptions/publishers **********/
+	ROS_INFO("Setting publishers/subscribers");
+	statusPublisher = handler.advertise<std_msgs::Bool>("/pr2_grasping/experiment_done", 1, true);
+	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
+	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
+	scenePublisher = handler.advertise<moveit_msgs::PlanningSceneWorld>("/planning_scene_world", 1);
+
+	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
+	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
+
+	if (debugEnabled)
+	{
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
+			ros::console::notifyLoggerLevelsChanged();
+
+		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
+		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
+	}
+
+
+	/********** Publish initial status **********/
+	std_msgs::Bool notDone;
+	notDone.data = false;
+	statusPublisher.publish(notDone);
+
+
 
 	/********** Setup the robot and environment **********/
 	std::string serviceName = "/pr2_grasping/gazebo_setup";
@@ -639,32 +666,8 @@ int main(int _argn, char **_argv)
 	targetObjectName = srv.response.trackedObject;
 
 
-	/********** Set subscriptions/publishers **********/
-	ROS_INFO("Setting publishers/subscribers");
-	statusPublisher = handler.advertise<std_msgs::Bool>("/pr2_grasping/experiment_done", 1, true);
-	cancelPublisher = handler.advertise<actionlib_msgs::GoalID>(RobotUtils::getGripperTopic(arm) + "/cancel", 1);
-	posePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/grasping_pose", 1, true);
-	scenePublisher = handler.advertise<moveit_msgs::PlanningSceneWorld>("/planning_scene_world", 1);
-
-	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 10, graspingPointsCallback);
-	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
-
+	/********** Start periodic check/ask for new grasping points **********/
 	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, side, debugEnabled));
-
-	if (debugEnabled)
-	{
-		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
-			ros::console::notifyLoggerLevelsChanged();
-
-		collisionPosePublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_collision_pose", 1, true);
-		graspingPointPublisher = handler.advertise<geometry_msgs::PoseStamped>("/pr2_grasping/debug_grasping_point", 1, true);
-	}
-
-
-	/********** Publish initial status **********/
-	std_msgs::Bool notDone;
-	notDone.data = false;
-	statusPublisher.publish(notDone);
 
 
 	ros::waitForShutdown();
