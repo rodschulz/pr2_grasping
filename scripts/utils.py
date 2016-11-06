@@ -1,3 +1,7 @@
+'''
+@author: rodrigo
+2016
+'''
 import numpy as np
 import sensor_msgs.point_cloud2 as pc
 import matplotlib.pyplot as plt

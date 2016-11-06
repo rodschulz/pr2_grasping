@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+'''
+@author: rodrigo
+2016
+'''
 import yaml
 import utils
 import rospy as rp
