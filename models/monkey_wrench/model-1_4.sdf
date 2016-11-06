@@ -5,27 +5,6 @@
     <link name="link">
       <pose>0 0 0 0 0 0</pose>
 
-      <!--
-      <collision name="shaft">
-        <pose>0 0 0 0 0 0</pose>
-        <geometry>
-          <cylinder>
-            <radius>0.1</radius>
-            <length>0.3</length>
-          </cylinder>
-        </geomtry>
-      </collision>
-
-      <collision name="head">
-        <pose>0 0 0 0 0 0</pose>
-        <geometry>
-          <cylinder>
-            <radius>0.1</radius>
-            <length>0.3</length>
-          </cylinder>
-        </geomtry>
-      </collision>
--->
       <collision name="collision">
         <geometry>
           <mesh>

@@ -31,8 +31,8 @@
         </geometry>
         <material>
           <script>
-            <uri>model://beer/materials/scripts</uri>
-            <uri>model://beer/materials/textures</uri>
+            <uri>model://thin_beer/materials/scripts</uri>
+            <uri>model://thin_beer/materials/textures</uri>
             <name>Beer/Diffuse</name>
           </script>
         </material>
