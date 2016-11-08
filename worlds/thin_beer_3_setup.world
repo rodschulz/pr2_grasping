@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.4">
-	<world name="wood_cube_setup">
+	<world name="thin_beer_setup">
 		<!-- A global light source -->
 		<include>
 			<uri>model://sun</uri>
@@ -17,9 +17,9 @@
 		</include>
 		<!-- A table to hold things -->
 		<include>
-			<uri>model://wood_cube</uri>
-			<name>wood_cube</name>
-			<pose>0.73 0 0.8 0 0 0</pose>
+			<uri>model://thin_beer</uri>
+			<name>thin_beer_3</name>
+			<pose>0.681194 -0.019517 0.498000 0 1.57 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->

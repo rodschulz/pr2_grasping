@@ -1,5 +1,5 @@
 <launch>
-	<arg name="world" default="thin_beer"/>
+	<arg name="world" default="thin_beer_1"/>
 	<arg name="rviz" default="false"/>
 	<arg name="gui" default="false"/>
 

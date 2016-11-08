@@ -7,7 +7,7 @@
 	<env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find pr2_grasping)/models" />
 
 	<!-- use this argument to use different worlds for the experimental setup -->
-	<arg name="world" default="thin_beer"/>
+	<arg name="world" default="thin_beer_1"/>
 
 	<!-- include world launch file -->
 	<include file="$(find gazebo_ros)/launch/empty_world.launch">
