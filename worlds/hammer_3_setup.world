@@ -15,11 +15,11 @@
 			<name>low_table</name>
 			<pose>1.4 0 0 0 0 0</pose>
 		</include>
-		<!-- A table to hold things -->
+		<!-- A hammer -->
 		<include>
 			<uri>model://hammer</uri>
 			<name>hammer</name>
-			<pose>0.715 0.07 0.48 -0.015544 0.027142 0.000285</pose>
+			<pose>0.715 0.07 0.68 1.57 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->
