@@ -18,7 +18,7 @@
 		<!-- A hammer -->
 		<include>
 			<uri>model://hammer</uri>
-			<name>hammer</name>
+			<name>hammer_3</name>
 			<pose>0.715 0.07 0.68 1.57 0 0</pose>
 		</include>
 

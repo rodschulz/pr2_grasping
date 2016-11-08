@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.4">
-	<world name="hammer_setup">
+	<world name="cordless_drill_setup">
 		<!-- A global light source -->
 		<include>
 			<uri>model://sun</uri>
@@ -15,11 +15,11 @@
 			<name>low_table</name>
 			<pose>1.4 0 0 0 0 0</pose>
 		</include>
-		<!-- A hammer -->
+		<!-- A table to hold things -->
 		<include>
-			<uri>model://hammer</uri>
-			<name>hammer_2</name>
-			<pose>0.716106 0.070043 0.531977 1.607972 1.430606 1.620333</pose>
+			<uri>model://cordless_drill</uri>
+			<name>cordless_drill_3</name>
+			<pose>0.805159 -0.138979 0.519095 -1.288993 -0.477832 -0.027077</pose>
 		</include>
 
 		<!-- Shadows disabled -->
