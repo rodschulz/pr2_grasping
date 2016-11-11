@@ -5,14 +5,15 @@
 import numpy as np
 import sensor_msgs.point_cloud2 as pc
 import matplotlib.pyplot as plt
+import matplotlib.figure as fig
 from mpl_toolkits.mplot3d import Axes3D
 import rospkg
+import datetime
 
 
-# Package's name
 packageName = 'pr2_grasping'
-# Relative location of node's config file 
 configLocation = 'config/config.yaml'
+outputLocation = 'output/'
 
 
 ##################################################
@@ -20,6 +21,13 @@ def getConfigPath():
 	rospack = rospkg.RosPack()
 	fullpath = rospack.get_path(packageName)
 	return fullpath + '/' + configLocation
+
+
+##################################################
+def getOutputPath():
+	rospack = rospkg.RosPack()
+	fullpath = rospack.get_path(packageName)
+	return fullpath + '/' + outputLocation
 
 
 ##################################################
@@ -78,12 +86,16 @@ def getPalette(paletteName_):
 
 
 ##################################################
-def plotData3D(data_, labels_, index_=-1, nclusters_=-1, palette_ = ''):
-	fig = plt.figure()
-	ax = fig.add_subplot(111, projection='3d')
+def plotData3D(path_, data_, labels_, index_=-1, nclusters_=-1, palette_ = ''):
+	params = fig.SubplotParams(left=.02, right=.98, top=.99, bottom=.01)
+	figure = plt.figure(figsize=(12, 9), subplotpars=params)
+	ax = figure.add_subplot(111, projection='3d')
 
 	classes = set(labels_)
 	colors = getPalette(palette_)
+
+	av = np.average(data_, axis=0)
+	d = 0.15
 
 	for cls, col in zip(classes, colors):
 		if cls == -1:
@@ -93,10 +105,18 @@ def plotData3D(data_, labels_, index_=-1, nclusters_=-1, palette_ = ''):
 		xclass = extractByDimension(dclass, 0)
 		yclass = extractByDimension(dclass, 1)
 		zclass = extractByDimension(dclass, 2)
-		ax.scatter(xclass, yclass, zclass, c=col, s=20, linewidth='0', alpha=1.0)
-		title = 'label' + str(index_)
+
+
+		ax.scatter3D(xclass, yclass, zclass, c=col, s=10, linewidth='0', alpha=1.0)
+		title = 'label_' + str(index_)
 		ax.set_title(title + ' (' + str(len(data_)) +' pts - ' + str(nclusters_) + ' clusters)')
 		ax.view_init(elev=30, azim=-15)
+		ax.set_xlabel('x')
+		ax.set_ylabel('y')
+		ax.set_zlabel('z') 
+		ax.set_xlim3d(av[0] - d, av[0] + d)
+		ax.set_ylim3d(av[1] - d, av[1] + d)
+		ax.set_zlim3d(av[2] - d, av[2] + d)
 
-	plt.savefig(title + '.png')
-	# plt.show()
+	filename = path_ + title + '_{:%Y-%m-%d_%H%M%S}'.format(datetime.datetime.now()) + '.png'
+	plt.savefig(filename)

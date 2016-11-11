@@ -18,7 +18,7 @@
 		<!-- A table to hold things -->
 		<include>
 			<uri>model://saucepan</uri>
-			<name>pan</name>
+			<name>saucepan</name>
 			<pose>0.62 0.2 0.8 0 0 -1.57079632679</pose>
 		</include>
 

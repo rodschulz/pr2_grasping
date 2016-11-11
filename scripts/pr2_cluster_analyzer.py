@@ -42,6 +42,7 @@ def filterByStd(data):
 
 	return filtered
 
+
 ##################################################
 def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 	points = []
@@ -109,7 +110,7 @@ def analyze(data_):
 
 			# Generate debug data if requested
 			if debug:
-				utils.plotData3D(positionData, db.labels_, key, nclusters, palette)
+				utils.plotData3D(utils.getOutputPath(), positionData, db.labels_, key, nclusters, palette)
 
 
 	# Publish the synthesized grasping points
@@ -117,7 +118,7 @@ def analyze(data_):
 
 	if debug:
 		for gp in graspPts:
-			rp.loginfo('.....p=(%.3f, %.3f, %.3f) - n=(%.3f, %.3f, %.3f) - l=%d', gp.position.x, gp.position.y, gp.position.z, gp.normal.x, gp.normal.y, gp.normal.z, gp.label)
+			rp.logdebug('.....p=(%.3f, %.3f, %.3f) - n=(%.3f, %.3f, %.3f) - l=%d', gp.position.x, gp.position.y, gp.position.z, gp.normal.x, gp.normal.y, gp.normal.z, gp.label)
 
 	msg = GraspingData()
 	msg.graspingPoints = graspPts
@@ -128,9 +129,6 @@ def analyze(data_):
 
 ##################################################
 if __name__ == '__main__':
-	# Setup node name
-	rp.init_node('pr2_cluster_analyzer', anonymous=False)
-
 	try:
 		# Load config file
 		with open(utils.getConfigPath(), 'r') as f:
@@ -139,6 +137,12 @@ if __name__ == '__main__':
 			epsilon = config['analyzer']['epsilon']
 			minPoints = config['analyzer']['minPoints']
 			palette = config['analyzer']['palette']
+
+		# Setup node name
+		level = rp.INFO
+		if debug:
+			level = rp.DEBUG
+		rp.init_node('pr2_cluster_analyzer', anonymous=False, log_level=level)
 
 		# Initialize published topic
 		publisher = rp.Publisher('/pr2_grasping/grasping_data', GraspingData, queue_size=10)

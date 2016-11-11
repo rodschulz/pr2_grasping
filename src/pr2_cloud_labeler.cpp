@@ -62,33 +62,6 @@ ros::Publisher limitsPublisher, planePublisher;
 
 
 /**************************************************/
-// float getEffectorAngle(const cv::Mat &bow_,
-// 		const int bandNumber_,
-// 		const int binNumber_,
-// 		const bool bidirectional_)
-// {
-// 	if (!bidirectional_)
-// 	{
-// 		float maxAngle = -1;
-// 		int targetBand = 0;
-// 		cv::Mat row = bow.row<float>(label);
-// 		for(int band = 0; band < bandNumber_; band++)
-// 		{
-// 			float meanAngle = cv::mean(row.colRange(band * binNumber_, (band + 1)* binNumber_)).val[0];
-// 			if (meanAngle > maxAngle)
-// 			{
-// 				maxAngle = meanAngle;
-// 				targetBand = band;
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 	}
-// }
-
-
-/**************************************************/
 template <typename PointType>
 std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> getBoundingBoxLimits(const typename pcl::PointCloud<PointType>::Ptr cloud_,
 		const std::string &frameId_)

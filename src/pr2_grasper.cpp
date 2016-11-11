@@ -160,7 +160,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.pre_grasp_approach.direction.vector.y = 0;
 	grasp.pre_grasp_approach.direction.vector.z = 0;
 	grasp.pre_grasp_approach.min_distance = 0.05;
-	grasp.pre_grasp_approach.desired_distance = 0.15;
+	grasp.pre_grasp_approach.desired_distance = 0.1;
 
 
 	grasp.pre_grasp_posture.joint_names.resize(1, prefix + "_gripper_motor_screw_joint");
@@ -182,7 +182,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.post_grasp_retreat.direction.vector.y = 0;
 	grasp.post_grasp_retreat.direction.vector.z = 1;
 	grasp.post_grasp_retreat.min_distance = 0.05;
-	grasp.post_grasp_retreat.desired_distance = 0.2;
+	grasp.post_grasp_retreat.desired_distance = 0.1;
 
 	grasp.allowed_touch_objects.clear();
 	grasp.allowed_touch_objects.push_back(objectTarget_);
