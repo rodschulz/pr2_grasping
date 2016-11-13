@@ -95,7 +95,7 @@ def plotData3D(path_, data_, labels_, index_=-1, nclusters_=-1, palette_ = ''):
 	colors = getPalette(palette_)
 
 	av = np.average(data_, axis=0)
-	d = 0.15
+	d = 0.2
 
 	for cls, col in zip(classes, colors):
 		if cls == -1:

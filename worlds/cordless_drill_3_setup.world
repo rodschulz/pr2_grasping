@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://cordless_drill</uri>
 			<name>cordless_drill_3</name>
-			<pose>0.805159 -0.138979 0.519095 -1.288993 -0.477832 -0.027077</pose>
+			<pose>0.689 -0.144 0.519 -1.288 -0.477 -0.491</pose>
 		</include>
 
 		<!-- Shadows disabled -->
