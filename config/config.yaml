@@ -2,7 +2,6 @@
 ########## experiments params ##########
 experiment:
     typeToRun: train # train or eval
-    runsNumber: 5
 
 
 ########## nodes params ##########
@@ -40,13 +39,13 @@ labeler:
     # point cloud input topic
     pointcloudTopic: /head_mount_kinect/depth_registered/points
     # sampling voxel size
-    voxelSize: 0.004
+    voxelSize: 0.002
     # location of the codebook file
     codebookLocation: config/bow50_c7_1E-4_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
-    writeClouds: false
+    writeClouds: true
 
 
 ##### grasper node options #####
@@ -64,9 +63,9 @@ grasper:
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
-    collisionMargin: 0.02
+    collisionMargin: 0.04
     # gap between object and effector at the begin of the grasping
-    graspPadding: 0.14
+    graspPadding: 0.15
 
 
 ##### evaluator node options #####
@@ -90,12 +89,12 @@ normalEstimationRadius: -1
 
 ##### descriptor calculation params #####
 descriptor:
-    patchSize: 0.02
+    patchSize: 0.02 # mts
     bandNumber: 8
-    bandWidth: 0.005
+    bandWidth: 0.005 # mts
     bidirectional: false
     useProjection: false
-    sequenceBin: 0.005
+    sequenceBin: 0.005 # mts
     sequenceStat: mean # mean or median
 
 ##### cloud smoothing params #####

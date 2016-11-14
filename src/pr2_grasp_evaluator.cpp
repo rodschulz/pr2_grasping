@@ -6,6 +6,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <pr2_grasping/EvaluationStatus.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
 #include <pcl_ros/point_cloud.h>
@@ -19,14 +20,16 @@
 
 #define CLOUDS_FOR_EVALUATION	3
 
+
 /***** Global variables *****/
 boost::mutex mutex;
 bool evaluateCloud = false;
 tf::TransformListener *tfListener;
 std::vector<bool> status;
+ros::Publisher statusPub;
 
 /***** Debug variables *****/
-ros::Publisher cloudPublisher, planeXPublisher, planeZPublisher;
+ros::Publisher cloudPub, planeXPub, planeZPub;
 
 
 /**************************************************/
@@ -85,19 +88,19 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			pcl::toROSMsg<pcl::PointXYZ>(*clipped2, cloudMsg);
 			cloudMsg.header.stamp = ros::Time::now();
 			cloudMsg.header.frame_id = msg_->header.frame_id;
-			cloudPublisher.publish(cloudMsg);
+			cloudPub.publish(cloudMsg);
 
 			sensor_msgs::PointCloud2 planeXMsg;
 			pcl::toROSMsg<pcl::PointXYZ>(*planeX, planeXMsg);
 			planeXMsg.header.stamp = ros::Time::now();
 			planeXMsg.header.frame_id = msg_->header.frame_id;
-			planeXPublisher.publish(planeXMsg);
+			planeXPub.publish(planeXMsg);
 
 			sensor_msgs::PointCloud2 planeZMsg;
 			pcl::toROSMsg<pcl::PointXYZ>(*planeZ, planeZMsg);
 			planeZMsg.header.stamp = ros::Time::now();
 			planeZMsg.header.frame_id = msg_->header.frame_id;
-			planeZPublisher.publish(planeZMsg);
+			planeZPub.publish(planeZMsg);
 		}
 
 
@@ -159,6 +162,13 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	evalPose.pose.position.z = object_.find("z")->second;;
 
 
+	// Publish evaluation status
+	pr2_grasping::EvaluationStatus stMsg;
+	stMsg.status = pr2_grasping::EvaluationStatus::BEFORE_EVAL;
+	statusPub.publish(stMsg);
+	ros::Duration(0.5).sleep();
+
+
 	// Iterate testing a set of poses to evaluate the grasping result
 	std::string effectorName = effector_->getName();
 	while (status.size() < 4)
@@ -197,6 +207,13 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		evaluateCloud = true;
 		mutex.unlock();
 
+
+		// Publish evaluation status
+		stMsg.status = pr2_grasping::EvaluationStatus::PERFORMING_NEW_EVAL;
+		statusPub.publish(stMsg);
+		ros::Duration(0.5).sleep();
+
+
 		// Wait until the pose was evaluated
 		size_t current = status.size();
 		ROS_DEBUG_STREAM("Testing gripper pose " << current);
@@ -213,6 +230,13 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	// Check if there's enough POSITIVE tested poses
 	int count = countTrue(status);
 	response_.result = count >= successThreshold_;
+
+
+	// Publish evaluation status
+	stMsg.status = pr2_grasping::EvaluationStatus::AFTER_EVAL;
+	statusPub.publish(stMsg);
+	ros::Duration(0.5).sleep();
+
 
 	ROS_DEBUG_STREAM("Positive tested poses: " << count);
 	ROS_INFO("Grasp result: %s", response_.result ? "SUCCESSFUL" : "FAILED");
@@ -250,15 +274,16 @@ int main(int argn_, char** argv_)
 
 	/********** Set subscriptions/publishers **********/
 	ros::Subscriber subscriber = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, clippingX, clippingZ, debugEnabled));
+	statusPub = handler.advertise<pr2_grasping::EvaluationStatus>("/pr2_grasping/evaluation_status", 1, false);
 
 	if (debugEnabled)
 	{
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
-		cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_cloud", 1, true);
-		planeXPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_x", 1, true);
-		planeZPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_z", 1, true);
+		cloudPub = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_cloud", 1, true);
+		planeXPub = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_x", 1, true);
+		planeZPub = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_evaluation_plane_z", 1, true);
 	}
 
 

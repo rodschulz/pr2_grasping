@@ -63,6 +63,7 @@ message(STATUS "${Cyan}\tBoost_INCLUDE_DIRS = ${Boost_INCLUDE_DIRS}${ColorReset}
 # Add custom message files
 add_message_files(
 	FILES
+		EvaluationStatus.msg
 		GraspingData.msg
 		GraspingPoint.msg
 		ObjectCloudData.msg

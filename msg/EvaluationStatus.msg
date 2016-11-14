@@ -1,0 +1,6 @@
+int32 status
+
+# statuses
+int32 BEFORE_EVAL=1
+int32 PERFORMING_NEW_EVAL=2
+int32 AFTER_EVAL=3
