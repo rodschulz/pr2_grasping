@@ -283,7 +283,7 @@ void saveResult(const std::string &targetObject_,
 {
 	std::string filename = GraspingUtils::getOutputPath() +
 						   targetObject_ + "_" +
-						   GraspingUtils::getTimestamp("%d-%m-%Y_%H:%M:%S") + ".yaml";
+						   GraspingUtils::getTimestamp("%Y-%m-%d_%H%M%S") + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
 
@@ -383,11 +383,11 @@ void timerCallback(const ros::TimerEvent &event_,
 		{
 			ROS_INFO("*** processing point %zu of %zu ***", i + 1, npoints);
 
-
 			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
 			{
 				ROS_INFO("### using angle %d of %d ###", j + 1, ANGLE_SPLIT_NUM);
 				float angle = j * ANGLE_STEP;
+
 
 				ROS_INFO("...clearing scene");
 				moveit_msgs::PlanningSceneWorld cleanScene;
@@ -448,6 +448,11 @@ void timerCallback(const ros::TimerEvent &event_,
 				}
 
 
+				// JUST FOR DEBUG
+				// code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+
+
+
 				// Set default value for the evaluator service message
 				pr2_grasping::GraspEvaluator srv;
 				srv.response.result = false;
@@ -486,9 +491,9 @@ void timerCallback(const ros::TimerEvent &event_,
 					ros::Duration(0.5).sleep();// little wait to be able to read the message
 				}
 
-
 				// Store the result of the grasping attempt
 				saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
+
 
 
 				/********** STAGE 2.7: remove collision objects **********/
@@ -515,6 +520,8 @@ void timerCallback(const ros::TimerEvent &event_,
 				ROS_INFO("### angle %d of %d processed ###", j + 1, ANGLE_SPLIT_NUM);
 			}
 
+			// Increase the grasp tracking index
+			graspIdx++;
 
 			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
 		}
@@ -528,7 +535,7 @@ void timerCallback(const ros::TimerEvent &event_,
 
 		// Publish the number of grasping point sets processed so far
 		std_msgs::Int32 sets;
-		sets.data = nsets++;
+		sets.data = ++nsets;
 		statusPub.publish(sets);
 	}
 
