@@ -19,7 +19,7 @@
 		<include>
 			<uri>model://wood_cube</uri>
 			<name>wood_cube_1</name>
-			<pose>0.73 0 0.8 0 0 0</pose>
+			<pose>0.7 0 0.8 0 0 0</pose>
 		</include>
 
 		<!-- Shadows disabled -->
