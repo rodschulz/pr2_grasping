@@ -526,17 +526,17 @@ void timerCallback(const ros::TimerEvent &event_,
 			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
 		}
 
+		// Publish the number of grasping point sets processed so far
+		std_msgs::Int32 sets;
+		sets.data = ++nsets;
+		statusPub.publish(sets);
+		ros::Duration(0.5).sleep();
+
 		// Remove the processed grasping data
 		ROS_DEBUG("Removing processed grasping data");
 		pmutex.lock();
 		queue.pop_front();
 		pmutex.unlock();
-
-
-		// Publish the number of grasping point sets processed so far
-		std_msgs::Int32 sets;
-		sets.data = ++nsets;
-		statusPub.publish(sets);
 	}
 
 	// Call the labeling service if no points are queued
