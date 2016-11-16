@@ -1,9 +1,4 @@
 ---
-########## experiments params ##########
-experiment:
-    typeToRun: train # train or eval
-
-
 ########## nodes params ##########
 
 # flags to enable/disable debug
@@ -13,6 +8,7 @@ analyzerDebug: false
 grasperDebug: false
 evaluatorDebug: false
 gmonitorDebug: false
+
 
 ##### setup node options #####
 setup:
@@ -38,8 +34,8 @@ setup:
 labeler:
     # point cloud input topic
     pointcloudTopic: /head_mount_kinect/depth_registered/points
-    # sampling voxel size
-    voxelSize: 0.002
+    # sampling voxel size (value < 0 to don't downsample)
+    voxelSize: -1
     # location of the codebook file
     codebookLocation: config/bow50_c7_1E-4_opencv.dat
     # clipping plane position in Z axis
@@ -60,6 +56,10 @@ analyzer:
 
 ##### grasper node options #####
 grasper:
+    # parameters regarding the use of a previously trained classifier for grasps
+    classifier:
+      use: true
+      location: config/svm_test.yaml
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
@@ -81,6 +81,7 @@ evaluator:
     position: {x: 0.45, y: 0, z: 0.8}
     # point cloud input topic
     pointcloudTopic: /move_group/filtered_cloud 
+
 
 ########## descriptor params ##########
 

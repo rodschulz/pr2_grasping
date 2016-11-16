@@ -198,8 +198,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
+		// Downsample if requested
 		pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-		GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
+		if (voxelSize_ > 0)
+			GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
+		else
+			sampled = cloudXYZ;
+
 
 		ROS_DEBUG("Clipping cloud");
 		pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
@@ -342,7 +347,7 @@ int main(int argn_, char **argv_)
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
 
 
-	/********** Load the codebook and prepare the classificator **********/
+	/********** Load the codebook and prepare the classifier **********/
 	ROS_INFO("Loading codebook");
 	cv::Mat codebook;
 	std::string codebookFile = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["labeler"]["codebookLocation"].as<std::string>();
@@ -351,7 +356,7 @@ int main(int argn_, char **argv_)
 		ROS_WARN("...unable to load codebook at %s", codebookFile.c_str());
 
 	ROS_INFO("Training labeling classifier");
-	svm = ClusteringUtils::prepareClassificator(codebook, metadata);
+	svm = ClusteringUtils::prepareClassifier(codebook, metadata);
 
 
 	/********** Set subscriptions/publishers **********/
