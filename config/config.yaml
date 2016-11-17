@@ -58,7 +58,7 @@ analyzer:
 grasper:
     # parameters regarding the use of a previously trained classifier for grasps
     classifier:
-      use: true
+      use: false
       location: config/svm_test.yaml
     # arm used for grasping tasks
     arm: right # right or left

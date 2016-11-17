@@ -3,6 +3,7 @@
  * 2016
  */
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <tf/transform_listener.h>
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
@@ -21,6 +22,7 @@
 #include <deque>
 #include <iostream>
 #include <fstream>
+#include <opencv2/ml/ml.hpp>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
 #include "RobotUtils.hpp"
@@ -31,6 +33,7 @@
 #define ANGLE_SPLIT_NUM		4
 #define ANGLE_STEP			M_PI / ANGLE_SPLIT_NUM
 
+typedef boost::shared_ptr<CvSVM> CvSVMPtr;
 
 enum GripperState
 {
@@ -47,6 +50,7 @@ float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
 std::string targetObjectName = "";
+CvSVMPtr classifier = CvSVMPtr();
 
 /***** Debug variables *****/
 ros::Publisher collisionPub, graspingPointPub;
@@ -143,11 +147,53 @@ geometry_msgs::PoseStamped genGraspingPose(const pr2_grasping::GraspingPoint &po
 
 
 /**************************************************/
+std::vector<moveit_msgs::CollisionObject> genCollisions(const bool debugEnabled_,
+		const geometry_msgs::PointStamped &minPt_,
+		const geometry_msgs::PointStamped &maxPt_)
+{
+	ROS_INFO("...generating collision object");
+
+	float colX = (minPt_.point.x + maxPt_.point.x) * 0.5;
+	float colY = (minPt_.point.y + maxPt_.point.y) * 0.5;
+	float colZ = (minPt_.point.z + maxPt_.point.z) * 0.5;
+	geometry_msgs::Pose targetPose = GraspingUtils::genPose(colX, colY, colZ);
+
+	if (debugEnabled_)
+	{
+		ROS_DEBUG("Publishing collision pose");
+		geometry_msgs::PoseStamped targetPoseMsg;
+		targetPoseMsg.header.frame_id = minPt_.header.frame_id;
+		targetPoseMsg.pose = targetPose;
+		collisionPub.publish(targetPoseMsg);
+	}
+
+	float dimX = maxPt_.point.x - minPt_.point.x + collisionMargin;
+	float dimY = maxPt_.point.y - minPt_.point.y + collisionMargin;
+	float dimZ = maxPt_.point.z - minPt_.point.z + collisionMargin;
+	moveit_msgs::CollisionObject targetCollision = genCollisionObject(OBJECT_TARGET, FRAME_BASE, targetPose, dimX, dimY, dimZ);
+
+	// Generate collision for the support object
+	dimX = 1.5;
+	dimY = 0.82;
+	dimZ = 0.46;
+	geometry_msgs::Pose supportPose = GraspingUtils::genPose(1.35, 0, 0.235);
+	moveit_msgs::CollisionObject supportCollision = genCollisionObject(OBJECT_SUPPORT, FRAME_BASE, supportPose, dimX, dimY, dimZ);
+
+
+	std::vector<moveit_msgs::CollisionObject> collisions;
+	collisions.push_back(targetCollision);
+	collisions.push_back(supportCollision);
+
+	return collisions;
+}
+
+
+/**************************************************/
 moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 							const EffectorSide &side_,
 							const geometry_msgs::PoseStamped &graspingPose_,
-							const std::string &objectTarget_,
-							const std::string &objectSupport_)
+							const std::string &targetId_,
+							const std::string &supportId_)
 {
 	moveit_msgs::Grasp grasp;
 	grasp.id = graspId_;
@@ -185,8 +231,8 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.post_grasp_retreat.desired_distance = 0.1;
 
 	grasp.allowed_touch_objects.clear();
-	grasp.allowed_touch_objects.push_back(objectTarget_);
-	grasp.allowed_touch_objects.push_back(objectSupport_);
+	grasp.allowed_touch_objects.push_back(targetId_);
+	grasp.allowed_touch_objects.push_back(supportId_);
 	grasp.allowed_touch_objects.push_back(prefix + "_forearm_roll_link");
 	grasp.allowed_touch_objects.push_back(prefix + "_forearm_link");
 	grasp.allowed_touch_objects.push_back(prefix + "_wrist_flex_link");
@@ -320,211 +366,348 @@ void saveResult(const std::string &targetObject_,
 
 
 /**************************************************/
-void timerCallback(const ros::TimerEvent &event_,
-				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
-				   MoveGroupPtr &effector_,
-				   const EffectorSide &side_,
-				   const bool debugEnabled_)
+void timerCallback(const ros::TimerEvent &event_)
 {
-	// Track the number of grasping points sets processed so far
+	// Call the labeling service if no points are queued
+	if (queue.empty())
+	{
+		pr2_grasping::CloudLabeler labeler;
+		if (ros::service::call("/pr2_grasping/cloud_labeler", labeler))
+			ROS_INFO("...labeling %s", labeler.response.result ? "SCHEDULED" : "NOT SCHEDULED");
+	}
+}
+
+
+/**************************************************/
+void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *planningScene_,
+					 MoveGroupPtr &effector_,
+					 const EffectorSide &side_,
+					 const bool debugEnabled_)
+{
+	// Number of sets of grasping points processed so far
 	static int nsets = 0;
+	// Number of grasping points processed
+	static int pointIdx = 0;
 
 	// Process data until empty
 	while (!queue.empty())
 	{
 		ROS_INFO("===== Processing grasping data =====");
-		static int graspIdx = 0;
-
 
 		/*********************************************************/
 		/********** STAGE 1: generate collision objects **********/
 		/*********************************************************/
-		ROS_INFO("...generating collision object");
-		geometry_msgs::PointStamped minPt = queue.front().boundingBoxMin;
-		geometry_msgs::PointStamped maxPt = queue.front().boundingBoxMax;
+		std::vector<moveit_msgs::CollisionObject> collisions = genCollisions(debugEnabled_, queue.front().boundingBoxMin, queue.front().boundingBoxMax);
 
-		float colX = (minPt.point.x + maxPt.point.x) * 0.5;
-		float colY = (minPt.point.y + maxPt.point.y) * 0.5;
-		float colZ = (minPt.point.z + maxPt.point.z) * 0.5;
-		geometry_msgs::Pose targetPose = GraspingUtils::genPose(colX, colY, colZ);
 
-		if (debugEnabled_)
+		/*********************************************************/
+		/********** STAGE 2: generate points to grasp ************/
+		/*********************************************************/
+		std::vector<moveit_msgs::Grasp> grasps;
+		std::vector<geometry_msgs::PoseStamped> DEBUG_points; // for debug only
+		std::vector<float> DEBUG_angles; // for debug only
+		if (classifier)
 		{
-			ROS_DEBUG("Publishing collision pose");
-			geometry_msgs::PoseStamped targetPoseMsg;
-			targetPoseMsg.header.frame_id = minPt.header.frame_id;
-			targetPoseMsg.pose = targetPose;
-			collisionPub.publish(targetPoseMsg);
+			ROS_INFO("...using classifier");
+
+			// USE THE CLASSIFIER TO GENERATE GRASPING POINTS!
+		}
+		else
+		{
+			ROS_INFO("...sweeping point-angle space");
+
+			size_t npoints = queue.front().graspingPoints.size();
+			for (size_t i = 0; i < npoints; i++)
+			{
+				pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+
+				for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+				{
+					// Synthesize the actual grasp
+					geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, j * ANGLE_STEP);
+					std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
+					moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+
+					grasps.push_back(grasp);
+
+					/***** FOR DEBUG ONLY *****/
+					geometry_msgs::PoseStamped gp = graspingPose;
+					gp.pose.position = point.position;
+					DEBUG_points.push_back(gp);
+					DEBUG_angles.push_back(j * ANGLE_STEP);
+				}
+
+				pointIdx++;
+			}
+			ROS_INFO("...synthesized %zu grasps", grasps.size());
 		}
 
-		float dimX = maxPt.point.x - minPt.point.x + collisionMargin;
-		float dimY = maxPt.point.y - minPt.point.y + collisionMargin;
-		float dimZ = maxPt.point.z - minPt.point.z + collisionMargin;
-		moveit_msgs::CollisionObject targetCollision = genCollisionObject(OBJECT_TARGET, FRAME_BASE, targetPose, dimX, dimY, dimZ);
-
-		// Generate collision for the support object
-		dimX = 1.5;
-		dimY = 0.82;
-		dimZ = 0.46;
-		geometry_msgs::Pose supportPose = GraspingUtils::genPose(1.35, 0, 0.235);
-		moveit_msgs::CollisionObject supportCollision = genCollisionObject(OBJECT_SUPPORT, FRAME_BASE, supportPose, dimX, dimY, dimZ);
-
-
-		std::vector<moveit_msgs::CollisionObject> collisions;
-		collisions.push_back(targetCollision);
-		collisions.push_back(supportCollision);
-
 
 		/*********************************************************/
-		/********** STAGE 2: test every grasping points **********/
+		/******** STAGE 3: attempt to grasp the object ***********/
 		/*********************************************************/
-		size_t npoints = queue.front().graspingPoints.size();
-		for (size_t i = 0; i < npoints; i++)
+		size_t ngrasps = grasps.size();
+		for (size_t i = 0; i < ngrasps; i++)
 		{
-			ROS_INFO("*** processing point %zu of %zu ***", i + 1, npoints);
+			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
+			moveit_msgs::Grasp grasp = grasps[i];
+			ROS_DEBUG("grasp id: %s", grasp.id.c_str());
 
-			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+
+			ROS_INFO("...clearing scene");
+			moveit_msgs::PlanningSceneWorld cleanScene;
+			scenePub.publish(cleanScene);
+			ros::Duration(2).sleep();
+
+			ROS_INFO("...adding collisions to scene");
+			planningScene_->addCollisionObjects(collisions);
+			ros::Duration(2).sleep();
+
+			ROS_DEBUG("publishing grasping pose");
+			posePub.publish(grasp.grasp_pose);
+			if (debugEnabled_)
 			{
-				ROS_INFO("### using angle %d of %d ###", j + 1, ANGLE_SPLIT_NUM);
-				float angle = j * ANGLE_STEP;
+				ROS_DEBUG("publishing grasping point");
+				graspingPointPub.publish(DEBUG_points[i]);
+			}
+
+			/********** Grasp attempt **********/
+			// Change gripper state
+			gmutex.lock();
+			gState = STATE_PERFORMING_GRASP;
+			gmutex.unlock();
+
+			// Perform the grasp
+			ROS_INFO("...attempting grasp");
+			int maxAttempts = 10;
+			moveit::planning_interface::MoveItErrorCode code;
+			for (int att = 0;
+					att < maxAttempts &&
+					code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
+					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED ;
+					att++)
+			{
+				ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
+				code = effector_->pick(OBJECT_TARGET, grasp);
+				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, att + 1, maxAttempts);
+			}
 
 
-				ROS_INFO("...clearing scene");
-				moveit_msgs::PlanningSceneWorld cleanScene;
-				scenePub.publish(cleanScene);
-				ros::Duration(2).sleep();
+			/********** Evaluate result if the grasp was completed **********/
+			pr2_grasping::GraspEvaluator srv;
+			srv.response.result = false;
 
+			// Skip the rest if the planning failed
+			bool attemptCompleted = false;
+			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
+					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+					 gState == STATE_STUCK))
+			{
+				attemptCompleted = true;
 
-				/********** STAGE 2.1: add collisions to the scene **********/
-				ROS_INFO("...adding collisions to scene");
-				planningScene_->addCollisionObjects(collisions);
-				ros::Duration(1.5).sleep();
-
-
-				/********** STAGE 2.2: generate grasping pose **********/
-				ROS_DEBUG("Generating grasping point");
-				pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
-				geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
-
-				ROS_DEBUG("Publishing grasping pose");
-				posePub.publish(graspingPose);
-
-				if (debugEnabled_)
-				{
-					ROS_DEBUG("Publishing grasping point");
-					geometry_msgs::PoseStamped pointMsg = graspingPose;
-					pointMsg.pose.position = point.position;
-					graspingPointPub.publish(pointMsg);
-				}
-
-
-				/********** STAGE 2.3: synthesize grasp **********/
-				ROS_INFO("...synthesizing grasp");
-				std::string id = GRASP_ID + boost::lexical_cast<std::string>(graspIdx) + "_" + boost::lexical_cast<std::string>(j);
-				moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
-
-
-				/********** STAGE 2.4: attempt grasp **********/
-				ROS_INFO("...attempting grasp");
-				std::vector<moveit_msgs::Grasp> grasps;
-				grasps.push_back(grasp);
-
-				// Change gripper state
-				gmutex.lock();
-				gState = STATE_PERFORMING_GRASP;
-				gmutex.unlock();
-
-				// Perform the grasp
-				int maxAttempts = 10;
-				int counter = 0;
-				moveit::planning_interface::MoveItErrorCode code;
-				while (code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
-						code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
-						counter++ < maxAttempts)
-				{
-					code = effector_->pick(OBJECT_TARGET, grasps);
-					ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
-					ros::Duration(1).sleep();
-				}
-
-
-				// JUST FOR DEBUG
-				// code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
-
-
-
-				// Set default value for the evaluator service message
-				pr2_grasping::GraspEvaluator srv;
-				srv.response.result = false;
-
-				// Skip the rest if the planning failed
-				bool attemptCompleted = false;
-				if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
-						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
-				{
-					attemptCompleted = true;
-
-					// Detach so the object can be 'seen'
-					ROS_INFO("...detaching object for evaluation");
-					effector_->detachObject(OBJECT_TARGET);
-					ros::Duration(0.5).sleep();
-
-
-					/********** STAGE 2.5: check the grasping attempt result **********/
-					ROS_INFO("...evaluating result");
-					while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
-						ros::Duration(0.5).sleep();
-
-					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
-					ros::Duration(0.5).sleep();
-
-
-					/********** STAGE 2.6: release the object **********/
-					// This MUST be done before restoring, otherwise the robot is also moved
-					ROS_INFO("...releasing object");
-					releaseObject(effector_, planningScene_, side_);
-					ros::Duration(0.5).sleep();
-				}
-				else
-				{
-					ROS_INFO("...attempt failed, skipping evaluation");
-					ros::Duration(0.5).sleep();// little wait to be able to read the message
-				}
-
-				// Store the result of the grasping attempt
-				saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
-
-
-
-				/********** STAGE 2.7: remove collision objects **********/
-				ROS_INFO("...detaching collision objects");
+				// Detach so the object can be 'seen'
+				ROS_INFO("...detaching object for evaluation");
 				effector_->detachObject(OBJECT_TARGET);
 				ros::Duration(0.5).sleep();
 
-				ROS_INFO("...removing collision objects");
-				std::vector<std::string> ids;
-				ids.push_back(OBJECT_TARGET);
-				ids.push_back(OBJECT_SUPPORT);
-				planningScene_->removeCollisionObjects(ids);
-				ros::Duration(0.5).sleep();
+				// Call the evaluation node
+				ROS_INFO("...evaluating result");
+				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+					ros::Duration(0.5).sleep();
 
-
-				/********** STAGE 2.8: restore the testing setup **********/
-				ROS_INFO("...restoring setup");
-				pr2_grasping::GazeboSetup setup;
-				if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
-					ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
-				ros::Duration(0.5).sleep();
-
-
-				ROS_INFO("### angle %d of %d processed ###", j + 1, ANGLE_SPLIT_NUM);
+				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 			}
+			else
+				ROS_INFO("...attempt failed, skipping evaluation");
 
-			// Increase the grasp tracking index
-			graspIdx++;
 
-			ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
+			// restore tracked state
+			gmutex.lock();
+			gState = STATE_IDLE;
+			gmutex.unlock();
+
+
+			/********** Store the result **********/
+			saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, DEBUG_angles[i], grasp, code);
+
+
+			/********** Restore back everything **********/
+			ROS_INFO("...releasing object");
+			releaseObject(effector_, planningScene_, side_);
+			ros::Duration(0.5).sleep();
+
+			ROS_INFO("...detaching objects");
+			effector_->detachObject(OBJECT_TARGET);
+			ros::Duration(0.5).sleep();
+
+			ROS_INFO("...removing collisions");
+			std::vector<std::string> ids;
+			ids.push_back(OBJECT_TARGET);
+			ids.push_back(OBJECT_SUPPORT);
+			planningScene_->removeCollisionObjects(ids);
+			ros::Duration(0.5).sleep();
+
+			ROS_INFO("...restoring setup");
+			pr2_grasping::GazeboSetup setup;
+			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
+				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
+			ros::Duration(2).sleep();
+
 		}
+
+
+
+
+
+		// size_t npoints = queue.front().graspingPoints.size();
+		// for (size_t i = 0; i < npoints; i++)
+		// {
+		// 	ROS_INFO("*** processing point %zu of %zu ***", i + 1, npoints);
+
+		// 	for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+		// 	{
+		// 		ROS_INFO("### using angle %d of %d ###", j + 1, ANGLE_SPLIT_NUM);
+		// 		float angle = j * ANGLE_STEP;
+
+
+		// 		ROS_INFO("...clearing scene");
+		// 		moveit_msgs::PlanningSceneWorld cleanScene;
+		// 		scenePub.publish(cleanScene);
+		// 		ros::Duration(2).sleep();
+
+
+		// 		/********** STAGE 2.1: add collisions to the scene **********/
+		// 		ROS_INFO("...adding collisions to scene");
+		// 		planningScene_->addCollisionObjects(collisions);
+		// 		ros::Duration(1.5).sleep();
+
+
+
+
+
+
+		// 		/********** STAGE 2.2: generate grasping pose **********/
+		// 		// ROS_DEBUG("Generating grasping point");
+		// 		// pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+		// 		// geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
+
+		// 		// ROS_DEBUG("Publishing grasping pose");
+		// 		// posePub.publish(graspingPose);
+
+		// 		// if (debugEnabled_)
+		// 		// {
+		// 		// 	ROS_DEBUG("Publishing grasping point");
+		// 		// 	geometry_msgs::PoseStamped pointMsg = graspingPose;
+		// 		// 	pointMsg.pose.position = point.position;
+		// 		// 	graspingPointPub.publish(pointMsg);
+		// 		// }
+
+
+		// 		// /********** STAGE 2.3: synthesize grasp **********/
+		// 		// ROS_INFO("...synthesizing grasp");
+		// 		// std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
+		// 		// moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+
+
+
+
+
+		// 		/********** STAGE 2.4: attempt grasp **********/
+		// 		ROS_INFO("...attempting grasp");
+		// 		std::vector<moveit_msgs::Grasp> grasps;
+		// 		grasps.push_back(grasp);
+
+		// 		// Change gripper state
+		// 		gmutex.lock();
+		// 		gState = STATE_PERFORMING_GRASP;
+		// 		gmutex.unlock();
+
+		// 		// Perform the grasp
+		// 		int maxAttempts = 10;
+		// 		int counter = 0;
+		// 		moveit::planning_interface::MoveItErrorCode code;
+		// 		while (code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
+		// 				code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+		// 				counter++ < maxAttempts)
+		// 		{
+		// 			code = effector_->pick(OBJECT_TARGET, grasps);
+		// 			ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, counter, maxAttempts);
+		// 			ros::Duration(1).sleep();
+		// 		}
+
+
+		// 		// Set default value for the evaluator service message
+		// 		pr2_grasping::GraspEvaluator srv;
+		// 		srv.response.result = false;
+
+		// 		// Skip the rest if the planning failed
+		// 		bool attemptCompleted = false;
+		// 		if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
+		// 				(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && gState == STATE_STUCK))
+		// 		{
+		// 			attemptCompleted = true;
+
+		// 			// Detach so the object can be 'seen'
+		// 			ROS_INFO("...detaching object for evaluation");
+		// 			effector_->detachObject(OBJECT_TARGET);
+		// 			ros::Duration(0.5).sleep();
+
+
+		// 			/********** STAGE 2.5: check the grasping attempt result **********/
+		// 			ROS_INFO("...evaluating result");
+		// 			while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+		// 				ros::Duration(0.5).sleep();
+
+		// 			ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+		// 			ros::Duration(0.5).sleep();
+
+
+		// 			/********** STAGE 2.6: release the object **********/
+		// 			// This MUST be done before restoring, otherwise the robot is also moved
+		// 			ROS_INFO("...releasing object");
+		// 			releaseObject(effector_, planningScene_, side_);
+		// 			ros::Duration(0.5).sleep();
+		// 		}
+		// 		else
+		// 		{
+		// 			ROS_INFO("...attempt failed, skipping evaluation");
+		// 			ros::Duration(0.5).sleep();// little wait to be able to read the message
+		// 		}
+
+		// 		// Store the result of the grasping attempt
+		// 		saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, angle, grasp, code);
+
+
+
+		// 		/********** STAGE 2.7: remove collision objects **********/
+		// 		ROS_INFO("...detaching collision objects");
+		// 		effector_->detachObject(OBJECT_TARGET);
+		// 		ros::Duration(0.5).sleep();
+
+		// 		ROS_INFO("...removing collision objects");
+		// 		std::vector<std::string> ids;
+		// 		ids.push_back(OBJECT_TARGET);
+		// 		ids.push_back(OBJECT_SUPPORT);
+		// 		planningScene_->removeCollisionObjects(ids);
+		// 		ros::Duration(0.5).sleep();
+
+
+		// 		/********** STAGE 2.8: restore the testing setup **********/
+		// 		ROS_INFO("...restoring setup");
+		// 		pr2_grasping::GazeboSetup setup;
+		// 		if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
+		// 			ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
+		// 		ros::Duration(0.5).sleep();
+
+
+		// 		ROS_INFO("### angle %d of %d processed ###", j + 1, ANGLE_SPLIT_NUM);
+		// 	}
+
+		// 	// Increase the grasp tracking index
+		// 	pointIdx++;
+
+		// 	ROS_INFO("*** point %zu of %zu processed ***", i + 1, npoints);
+		// }
 
 		// Publish the number of grasping point sets processed so far
 		std_msgs::Int32 sets;
@@ -539,13 +722,13 @@ void timerCallback(const ros::TimerEvent &event_,
 		pmutex.unlock();
 	}
 
-	// Call the labeling service if no points are queued
-	if (queue.empty())
-	{
-		pr2_grasping::CloudLabeler labeler;
-		if (ros::service::call("/pr2_grasping/cloud_labeler", labeler))
-			ROS_INFO("...labeling %s", labeler.response.result ? "SCHEDULED" : "NOT SCHEDULED");
-	}
+	// // Call the labeling service if no points are queued
+	// if (queue.empty())
+	// {
+	// 	pr2_grasping::CloudLabeler labeler;
+	// 	if (ros::service::call("/pr2_grasping/cloud_labeler", labeler))
+	// 		ROS_INFO("...labeling %s", labeler.response.result ? "SCHEDULED" : "NOT SCHEDULED");
+	// }
 }
 
 
@@ -608,6 +791,48 @@ int main(int _argn, char **_argv)
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 
+	// Load the classifier if requested
+	if (Config::get()["grasper"]["classifier"]["use"].as<bool>())
+	{
+		std::string location = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["grasper"]["classifier"]["location"].as<std::string>();
+
+		ROS_INFO("Loading classifier at %s", location.c_str());
+		classifier = CvSVMPtr(new CvSVM());
+		classifier->load(location.c_str());
+	}
+
+
+	// cv::Mat output;
+	// cv::Mat input = cv::Mat::zeros(10, 2, CV_32FC1);
+	// input.at<float>(0, 0) = 5;
+	// input.at<float>(0, 1) = 0.7853982;
+	// input.at<float>(1, 0) = 1;
+	// input.at<float>(1, 1) = 0.123;
+	// input.at<float>(2, 0) = 3;
+	// input.at<float>(2, 1) = 0.5245;
+	// input.at<float>(3, 0) = 5;
+	// input.at<float>(3, 1) = 0.762;
+	// input.at<float>(4, 0) = 6;
+	// input.at<float>(4, 1) = 2.54;
+	// input.at<float>(5, 0) = 7;
+	// input.at<float>(5, 1) = 3.3234;
+	// input.at<float>(6, 0) = 7;
+	// input.at<float>(6, 1) = 0.7853982;
+	// input.at<float>(7, 0) = 7;
+	// input.at<float>(7, 1) = 0.7853982;
+	// input.at<float>(8, 0) = 0;
+	// input.at<float>(8, 1) = 1.453453;
+	// input.at<float>(9, 0) = 1;
+	// input.at<float>(9, 1) = 0.2;
+
+	// ROS_DEBUG_STREAM("predicting");
+	// classifier->predict(input, output);
+	// ROS_INFO_STREAM("input\n" << input << std::endl);
+	// ROS_INFO_STREAM("output\n" << output << std::endl);
+
+	// return 0;
+
+
 
 	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
@@ -668,9 +893,16 @@ int main(int _argn, char **_argv)
 
 
 	/********** Start periodic check/ask for new grasping points **********/
-	ros::Timer timer = handler.createTimer(ros::Duration(2), boost::bind(timerCallback, _1, &planningScene, effector, side, debugEnabled));
+	ros::Timer timer = handler.createTimer(ros::Duration(2), timerCallback);
 
+	// Spin at 10 Hz
+	ros::Rate r(10);
+	while (ros::ok())
+	{
+		graspingRoutine(&planningScene, effector, side, debugEnabled);
+		r.sleep();
+	}
 
-	ros::waitForShutdown();
+	ros::shutdown();
 	return EXIT_SUCCESS;
 }

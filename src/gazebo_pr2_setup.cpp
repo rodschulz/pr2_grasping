@@ -139,6 +139,7 @@ void moveHead()
 						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5),
 						 FRAME_BASE);
 
+	ros::Duration(2).sleep();
 	ROS_INFO("...head moved");
 }
 
