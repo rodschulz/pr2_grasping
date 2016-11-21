@@ -3,3 +3,5 @@
 bool result
 # Name of the tracked object by the setup service
 string trackedObject
+# Name of the support object
+string supportObject

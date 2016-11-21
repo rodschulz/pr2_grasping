@@ -23,7 +23,8 @@
 bool stopDisplacement = false;
 float displacementThreshold = 1.0;
 ros::Publisher cmdPublisher;
-std::pair<std::string, geometry_msgs::Pose> state;
+std::pair<std::string, geometry_msgs::Pose> trackedObject;
+std::pair<std::string, geometry_msgs::Pose> supportObject;
 MoveGroupPtr arms;
 
 
@@ -166,10 +167,13 @@ void retrieveWorldState()
 	for (std::map<std::string, geometry_msgs::Pose>::const_iterator it = initState.begin(); it != initState.end(); it++)
 	{
 		ROS_INFO_STREAM("..." << it->first);
-		state.first = it->first;
-		state.second = it->second;
-
-		break;
+		if (boost::iequals(supportObject.first, it->first))
+			supportObject.second = it->second;
+		else
+		{
+			trackedObject.first = it->first;
+			trackedObject.second = it->second;
+		}
 	}
 }
 
@@ -180,9 +184,15 @@ bool resetObject()
 	ROS_INFO("Reseting target object state");
 
 	bool resetOk = true;
-	if (!GazeboUtils::setModelState(state.first, state.second, "world"))
+	if (!GazeboUtils::setModelState(supportObject.first, supportObject.second, "world"))
 	{
-		ROS_WARN_STREAM("Can't reset state of model '" << state.first << "'");
+		ROS_WARN_STREAM("Can't reset state of model '" << supportObject.first << "'");
+		resetOk = false;
+	}
+	ros::Duration(2.0).sleep();
+	if (!GazeboUtils::setModelState(trackedObject.first, trackedObject.second, "world"))
+	{
+		ROS_WARN_STREAM("Can't reset state of model '" << trackedObject.first << "'");
 		resetOk = false;
 	}
 
@@ -212,7 +222,8 @@ bool runSetup(pr2_grasping::GazeboSetup::Request  & request_,
 	bool resetOk = resetObject();
 
 	response_.result = resetOk && armsOk;
-	response_.trackedObject = state.first;
+	response_.trackedObject = trackedObject.first;
+	response_.supportObject = supportObject.first;
 	ROS_INFO("Setup routine %s...", response_.result ? "SUCCESSFUL" : "FAILED");
 
 	return true;
@@ -238,6 +249,7 @@ int main(int argn_, char** argv_)
 
 	bool debugEnabled = Config::get()["setupDebug"].as<bool>();
 	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>();
+	supportObject.first = Config::get()["setup"]["support"].as<std::string>();
 
 	if (debugEnabled)
 	{
