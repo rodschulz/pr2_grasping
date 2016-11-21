@@ -26,6 +26,7 @@
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
 #include "RobotUtils.hpp"
+#include "GazeboUtils.hpp"
 #include "IO.hpp"
 
 
@@ -49,7 +50,8 @@ std::deque<pr2_grasping::GraspingData> queue;
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
 GripperState gState = STATE_IDLE;
-std::string targetObjectName = "";
+std::string trackedObject = "";
+std::string supportObject = "";
 CvSVMPtr classifier = CvSVMPtr();
 
 /***** Debug variables *****/
@@ -205,7 +207,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.pre_grasp_approach.direction.vector.x = 1;
 	grasp.pre_grasp_approach.direction.vector.y = 0;
 	grasp.pre_grasp_approach.direction.vector.z = 0;
-	grasp.pre_grasp_approach.min_distance = 0.01;
+	grasp.pre_grasp_approach.min_distance = 0.05;
 	grasp.pre_grasp_approach.desired_distance = 0.1;
 
 
@@ -227,7 +229,7 @@ moveit_msgs::Grasp genGrasp(const std::string &graspId_,
 	grasp.post_grasp_retreat.direction.vector.x = 0;
 	grasp.post_grasp_retreat.direction.vector.y = 0;
 	grasp.post_grasp_retreat.direction.vector.z = 1;
-	grasp.post_grasp_retreat.min_distance = 0.01;
+	grasp.post_grasp_retreat.min_distance = 0.05;
 	grasp.post_grasp_retreat.desired_distance = 0.1;
 
 	grasp.allowed_touch_objects.clear();
@@ -315,53 +317,6 @@ void releaseObject(MoveGroupPtr &effector_,
 
 
 	ROS_INFO(".....release action completed");
-}
-
-
-/**************************************************/
-void saveResult(const std::string &targetObject_,
-				const bool completed_,
-				const bool success_,
-				const int label_,
-				const float angle_,
-				const moveit_msgs::Grasp &grasp_,
-				const moveit::planning_interface::MoveItErrorCode &errCode_)
-{
-	std::string filename = GraspingUtils::getOutputPath() +
-						   targetObject_ + "_" +
-						   GraspingUtils::getTimestamp("%Y-%m-%d_%H%M%S") + ".yaml";
-
-	ROS_DEBUG_STREAM("Saving to: " << filename);
-
-	// generate a YAML file with the results
-	YAML::Emitter emitter;
-	emitter << YAML::BeginMap
-			<< YAML::Key << "target_object" << YAML::Value <<  targetObject_
-			<< YAML::Key << "cluster_label" << YAML::Value << label_
-
-			<< YAML::Key << "result"
-			<< YAML::BeginMap
-			<< YAML::Key << "attempt_completed" << YAML::Value << completed_
-			<< YAML::Key << "success" << YAML::Value << success_
-			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
-			<< YAML::EndMap
-
-			<< YAML::Key << "orientation"
-			<< YAML::BeginMap
-			<< YAML::Key << "angle" << YAML::Value << angle_
-			<< YAML::Key << "split_number" << YAML::Value << ANGLE_SPLIT_NUM
-			<< YAML::Key << "angle_step" << YAML::Value << ANGLE_STEP
-			<< YAML::EndMap
-
-			<< YAML::Key << "grasp" << YAML::Value << grasp_
-			<< YAML::EndMap;
-
-	std::ofstream output;
-	output.open(filename.c_str(), std::fstream::out);
-	output << emitter.c_str();
-	output.close();
-
-	ROS_INFO("...saved");
 }
 
 
@@ -457,7 +412,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			ROS_INFO("...clearing scene");
 			moveit_msgs::PlanningSceneWorld cleanScene;
 			scenePub.publish(cleanScene);
-			ros::Duration(2).sleep();
+			ros::Duration(1).sleep();
 
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
@@ -505,6 +460,57 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			{
 				attemptCompleted = true;
 
+				// Move the support object so it doesn't obstructs the evaluation
+				ROS_INFO("Setting table pose");
+				geometry_msgs::Pose auxPose;
+				auxPose.position.x = 4;
+				while (!GazeboUtils::setModelState(supportObject, auxPose, "world"))
+					ros::Duration(1).sleep();
+				ROS_INFO("Table pose set");
+				ros::Duration(2).sleep();
+
+
+				// ROS_INFO("Removing support collision");
+				// std::vector<std::string> ids;
+				// ids.push_back(OBJECT_SUPPORT);
+				// planningScene_->removeCollisionObjects(ids);
+				// ros::Duration(2).sleep();
+
+
+				// ROS_INFO("...attaching grasped object");
+				// std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
+				// std::vector<std::string> allowedTouch;
+				// allowedTouch.push_back(prefix + "_forearm_roll_link");
+				// allowedTouch.push_back(prefix + "_forearm_link");
+				// allowedTouch.push_back(prefix + "_wrist_flex_link");
+				// allowedTouch.push_back(prefix + "_wrist_roll_link");
+				// allowedTouch.push_back(prefix + "_gripper_palm_link");
+				// allowedTouch.push_back(prefix + "_gripper_r_finger_link");
+				// allowedTouch.push_back(prefix + "_gripper_r_finger_tip_link");
+				// allowedTouch.push_back(prefix + "_gripper_l_finger_link");
+				// allowedTouch.push_back(prefix + "_gripper_l_finger_tip_link");
+				// allowedTouch.push_back(OBJECT_SUPPORT);
+				// effector_->attachObject(OBJECT_TARGET, "", allowedTouch);
+
+
+				// geometry_msgs::PoseStamped xx;
+				// xx.header.frame_id = FRAME_BASE;
+				// xx.pose.position.x = 0.4;
+				// xx.pose.position.y = -0.4;
+				// xx.pose.position.z = 0.7;
+				// effector_->setPoseTarget(xx);
+				// if (!RobotUtils::move(effector_, 10))
+				// {
+				// 	ROS_INFO("FUCK!!!");
+				// }
+
+
+
+
+
+
+
+
 				// Detach so the object can be 'seen'
 				ROS_INFO("...detaching object for evaluation");
 				effector_->detachObject(OBJECT_TARGET);
@@ -534,7 +540,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 
 			/********** Store the result **********/
-			saveResult(targetObjectName, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, DEBUG_angles[i], grasp, code);
+			IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, DEBUG_angles[i], ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
 
 
 			/********** Restore back everything **********/
@@ -557,7 +563,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			pr2_grasping::GazeboSetup setup;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
 				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
-			ros::Duration(2).sleep();
+			// ros::Duration(2).sleep();
 		}
 
 
@@ -569,7 +575,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		std_msgs::Int32 sets;
 		sets.data = ++nsets;
 		statusPub.publish(sets);
-		ros::Duration(0.5).sleep();
+		// ros::Duration(0.5).sleep();
 
 		// Remove the processed grasping data
 		ROS_DEBUG("Removing processed grasping data");
@@ -735,9 +741,10 @@ int main(int _argn, char **_argv)
 	{
 		if (ros::service::call(serviceName, srv))
 			ROS_INFO("Setup %s", srv.response.result ? "SUCCEEDED" : "FAILED, retrying...");
-		ros::Duration(1.0).sleep();
+		ros::Duration(0.5).sleep();
 	}
-	targetObjectName = srv.response.trackedObject;
+	trackedObject = srv.response.trackedObject;
+	supportObject = srv.response.supportObject;
 
 
 	/********** Start periodic check/ask for new grasping points **********/
