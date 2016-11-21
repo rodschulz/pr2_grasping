@@ -4,6 +4,8 @@
 	<arg name="gui" default="false"/>
 
 	<env name="ROSCONSOLE_FORMAT" value="[${severity}][${node}]: ${message}" />
+	<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
+	<env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find pr2_grasping)/models" />
 
 	<!-- launch the base nodes -->
 	<include file="$(find pr2_grasping)/launch/base.launch">
