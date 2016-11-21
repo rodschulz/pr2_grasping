@@ -7,23 +7,30 @@
 #include <string>
 #include <ros/time.h>
 #include <ros/duration.h>
-// #include <std_msgs/Header.h>
-// #include <trajectory_msgs/JointTrajectoryPoint.h>
-// #include <trajectory_msgs/JointTrajectory.h>
-// #include <geometry_msgs/Pose.h>
 #include <moveit_msgs/Grasp.h>
 #include <yaml-cpp/yaml.h>
+#include <moveit/move_group_interface/move_group.h>
+
 
 class IO
 {
 public:
 	/**************************************************/
-	static void save();
+	static void saveResults(const std::string &targetObject_,
+							const bool attemptCompleted_,
+							const bool attemptSuccessful_,
+							const int clusterLabel_,
+							const float gripperAngle_,
+							const int gripperAngleSplitNum_,
+							const float gripperAngleStep_,
+							const moveit_msgs::Grasp &grasp_,
+							const moveit::planning_interface::MoveItErrorCode &errCode_);
 
 private:
 	IO();
 	~IO();
 };
+
 
 /**************************************************/
 YAML::Emitter& operator << (YAML::Emitter& out, const ros::Time &obj_)
