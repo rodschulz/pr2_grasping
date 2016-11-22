@@ -48,14 +48,23 @@ POINT_CLOUD_REGISTER_POINT_STRUCT ( PointXYZNL,
 								  )
 
 
+/***** Enumeration with the labeling states *****/
+enum LabelingState
+{
+	STATE_IDLE,
+	STATE_RECEIVING_CLOUD,
+	STATE_LABELING,
+};
+
+
 /***** Global variables *****/
 tf::TransformListener *tfListener;
 ros::Publisher cloudPublisher, dataPublisher;
-CvSVMPtr svm;
+LabelingState state = STATE_IDLE;
+pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
+std::string cloudFrameId;
 boost::mutex mutex;
-bool labelingScheduled = false;
-int labelingTries = 0;
-int labelingMaxAttempts = 5;
+CvSVMPtr svm;
 
 /***** Debug variables *****/
 ros::Publisher limitsPublisher, planePublisher;
@@ -146,7 +155,10 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 				   const bool debugEnabled_,
 				   const bool writeClouds_)
 {
-	if (labelingScheduled)
+	static int labelingTries = 0;
+	int labelingMaxAttempts = 5;
+
+	if (state == STATE_RECEIVING_CLOUD)
 	{
 		if (msg_->height == 0 || msg_->width == 0)
 		{
@@ -154,17 +166,14 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
-		mutex.lock();
-		++labelingTries;
-		mutex.unlock();
-
 		// Stop if too many try have been done
 		if (labelingTries++ >= labelingMaxAttempts)
 		{
 			ROS_WARN("Too many labeling attempts failed, stopping...");
-			mutex.lock();
 			labelingTries = 0;
-			labelingScheduled = false;
+
+			mutex.lock();
+			state = STATE_IDLE;
 			mutex.unlock();
 			return;
 		}
@@ -182,125 +191,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 			return;
 		}
 
+		cloudFrameId = msg_->header.frame_id;
+		receivedCloud = cloudXYZ;
 
-		/***** STAGE 2: prepare the data *****/
-
-		// Get the required transformation
-		tf::StampedTransform transformation;
-		while (!GraspingUtils::getTransformation(transformation, tfListener, msg_->header.frame_id, FRAME_BASE));
-
-		// Prepare cloud
-		ROS_DEBUG("Removing NANs");
-		CloudUtils::removeNANs(cloudXYZ);
-		if (cloudXYZ->empty())
-		{
-			ROS_WARN("Cloud empty after NaN removal, skipping");
-			return;
-		}
-
-		// Downsample if requested
-		pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
-		if (voxelSize_ > 0)
-			GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
-		else
-			sampled = cloudXYZ;
-
-
-		ROS_DEBUG("Clipping cloud");
-		pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
-		pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::planeClipping(sampled, transformation, AXIS_Z, clippingPlaneZ_, 1, clippingPlane);
-
-		ROS_DEBUG("Cloud clipped");
-		if (filtered->empty())
-		{
-			ROS_WARN("Cloud empty after filtering, skipping");
-			return;
-		}
-
-
-		// Transform the filtered cloud to base's frame
-		ROS_DEBUG("Transforming cloud from '%s' to '%s'", msg_->header.frame_id.c_str(), FRAME_BASE);
-		while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_BASE, msg_->header.frame_id));
-		pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
-		pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
-		std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits<pcl::PointXYZ>(transformed, FRAME_BASE);
-
-		if (debugEnabled_)
-		{
-			ROS_DEBUG("Publishing debug data");
-
-			geometry_msgs::PoseArray arrayMsg;
-			arrayMsg.header.frame_id = limits.first.header.frame_id;
-			arrayMsg.poses.push_back(GraspingUtils::genPose(limits.first.point.x, limits.first.point.y, limits.first.point.z));
-			arrayMsg.poses.push_back(GraspingUtils::genPose(limits.second.point.x, limits.second.point.y, limits.second.point.z));
-			limitsPublisher.publish(arrayMsg);
-
-			sensor_msgs::PointCloud2 planeMsg;
-			pcl::toROSMsg<pcl::PointXYZ>(*clippingPlane, planeMsg);
-			planeMsg.header.stamp = ros::Time::now();
-			planeMsg.header.frame_id = msg_->header.frame_id;
-			planePublisher.publish(planeMsg);
-		}
-
-
-		/***** STAGE 3: calculate relevant info *****/
-
-		// Calculate and update the cloud's viewpoint to perform a correct normals estimation
-		geometry_msgs::Point viewPoint = GraspingUtils::transformPoint(tfListener, FRAME_BASE, msg_->header.frame_id, geometry_msgs::Point());
-		transformed->sensor_origin_.x() = viewPoint.x;
-		transformed->sensor_origin_.y() = viewPoint.y;
-		transformed->sensor_origin_.z() = viewPoint.z;
-
-
-		// Estimate normals and generate an unique cloud
-		ROS_INFO("...estimating normals");
-		pcl::PointCloud<pcl::Normal>::Ptr normals = CloudUtils::estimateNormals(transformed, Config::getNormalEstimationRadius());
-		pcl::PointCloud<pcl::PointNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointNormal>());
-		pcl::concatenateFields(*transformed, *normals, *cloud);
-		cloud->sensor_origin_ = transformed->sensor_origin_;
-
-
-		// Descriptor dense evaluation over the point cloud
-		ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
-		cv::Mat descriptors;
-		Calculator::calculateDescriptors(cloud, Config::getDescriptorParams(), descriptors);
-
-		cv::Mat labels;
-		ROS_INFO("...labeling cloud");
-		svm->predict(descriptors, labels);
-
-
-		/***** STAGE 4: publish data *****/
-		pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled_);
-
-		sensor_msgs::PointCloud2 objectCloud;
-		pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
-		objectCloud.header.stamp = ros::Time::now();
-		objectCloud.header.frame_id = FRAME_BASE;
-
-		pr2_grasping::ObjectCloudData objectData;
-		objectData.cloud = objectCloud;
-		objectData.boundingBoxMin = limits.first;
-		objectData.boundingBoxMax = limits.second;
-
-		ROS_DEBUG("Publishing data");
-		cloudPublisher.publish(objectCloud);
-		dataPublisher.publish(objectData);
-
-
-		// Write debug data
-		static bool cloudsWritten = false;
-		if (debugEnabled_ && writeClouds_ && !cloudsWritten)
-		{
-			std::string outputDir = GraspingUtils::getOutputPath();
-			Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
-			pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
-			cloudsWritten =  true;
-		}
-
-		mutex.lock();
-		labelingScheduled = false;
+		// Reset control variables
 		labelingTries = 0;
+		mutex.lock();
+		state = STATE_LABELING;
 		mutex.unlock();
 	}
 }
@@ -310,15 +207,154 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 bool scheduleLabeling(pr2_grasping::CloudLabeler::Request  &request_,
 					  pr2_grasping::CloudLabeler::Response &response_)
 {
-	if (!labelingScheduled)
+	if (state == STATE_IDLE)
 	{
 		mutex.lock();
-		labelingScheduled = true;
+		state = STATE_RECEIVING_CLOUD;
 		mutex.unlock();
 	}
 
 	response_.result = true;
 	return true;
+}
+
+
+/**************************************************/
+void labelCloud(const float voxelSize_,
+				const float clippingPlaneZ_,
+				const bool debugEnabled_,
+				const bool writeClouds_)
+{
+	/***** STAGE 1: prepare the data *****/
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudXYZ = receivedCloud;
+
+	// Get the required transformation
+	tf::StampedTransform transformation;
+	while (!GraspingUtils::getTransformation(transformation, tfListener, cloudFrameId, FRAME_BASE));
+
+	// Prepare cloud
+	ROS_DEBUG("Removing NANs");
+	CloudUtils::removeNANs(cloudXYZ);
+	if (cloudXYZ->empty())
+	{
+		ROS_WARN("Cloud empty after NaN removal, skipping");
+		mutex.lock();
+		state = STATE_IDLE;
+		receivedCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr();
+		mutex.unlock();
+		return;
+	}
+
+	// Downsample if requested
+	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
+	if (voxelSize_ > 0)
+		GraspingUtils::downsampleCloud(cloudXYZ, voxelSize_, sampled);
+	else
+		sampled = cloudXYZ;
+
+
+	ROS_DEBUG("Clipping cloud");
+	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
+	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::planeClipping(sampled, transformation, AXIS_Z, clippingPlaneZ_, 1, clippingPlane);
+
+	ROS_DEBUG("Cloud clipped");
+	if (filtered->empty())
+	{
+		ROS_WARN("Cloud empty after filtering, skipping");
+		mutex.lock();
+		state = STATE_IDLE;
+		receivedCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr();
+		mutex.unlock();
+		return;
+	}
+
+
+	// Transform the filtered cloud to base's frame
+	ROS_DEBUG("Transforming cloud from '%s' to '%s'", cloudFrameId.c_str(), FRAME_BASE);
+	while (!GraspingUtils::getTransformation(transformation, tfListener, FRAME_BASE, cloudFrameId));
+	pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
+	pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
+	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits<pcl::PointXYZ>(transformed, FRAME_BASE);
+
+	if (debugEnabled_)
+	{
+		ROS_DEBUG("Publishing debug data");
+
+		geometry_msgs::PoseArray arrayMsg;
+		arrayMsg.header.frame_id = limits.first.header.frame_id;
+		arrayMsg.poses.push_back(GraspingUtils::genPose(limits.first.point.x, limits.first.point.y, limits.first.point.z));
+		arrayMsg.poses.push_back(GraspingUtils::genPose(limits.second.point.x, limits.second.point.y, limits.second.point.z));
+		limitsPublisher.publish(arrayMsg);
+
+		sensor_msgs::PointCloud2 planeMsg;
+		pcl::toROSMsg<pcl::PointXYZ>(*clippingPlane, planeMsg);
+		planeMsg.header.stamp = ros::Time::now();
+		planeMsg.header.frame_id = cloudFrameId;
+		planePublisher.publish(planeMsg);
+	}
+
+
+	/***** STAGE 2: calculate relevant info *****/
+
+	// Calculate and update the cloud's viewpoint to perform a correct normals estimation
+	geometry_msgs::Point viewPoint = GraspingUtils::transformPoint(tfListener, FRAME_BASE, cloudFrameId, geometry_msgs::Point());
+	transformed->sensor_origin_.x() = viewPoint.x;
+	transformed->sensor_origin_.y() = viewPoint.y;
+	transformed->sensor_origin_.z() = viewPoint.z;
+
+
+	// Estimate normals and generate an unique cloud
+	ROS_INFO("...estimating normals");
+	pcl::PointCloud<pcl::Normal>::Ptr normals = CloudUtils::estimateNormals(transformed, Config::getNormalEstimationRadius());
+	pcl::PointCloud<pcl::PointNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointNormal>());
+	pcl::concatenateFields(*transformed, *normals, *cloud);
+	cloud->sensor_origin_ = transformed->sensor_origin_;
+
+
+	// Descriptor dense evaluation over the point cloud
+	ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
+	cv::Mat descriptors;
+	Calculator::calculateDescriptors(cloud, Config::getDescriptorParams(), descriptors);
+
+	cv::Mat labels;
+	ROS_INFO("...labeling cloud");
+	svm->predict(descriptors, labels);
+
+
+	/***** STAGE 3: publish data *****/
+	pcl::PointCloud<PointXYZNL>::Ptr labeledCloud = generateLabeledCloud(cloud, labels, debugEnabled_);
+
+	sensor_msgs::PointCloud2 objectCloud;
+	pcl::toROSMsg<PointXYZNL>(*labeledCloud, objectCloud);
+	objectCloud.header.stamp = ros::Time::now();
+	objectCloud.header.frame_id = FRAME_BASE;
+
+	pr2_grasping::ObjectCloudData objectData;
+	objectData.cloud = objectCloud;
+	objectData.boundingBoxMin = limits.first;
+	objectData.boundingBoxMax = limits.second;
+
+	ROS_DEBUG("Publishing data");
+	cloudPublisher.publish(objectCloud);
+	dataPublisher.publish(objectData);
+
+
+	// Write debug data
+	static bool cloudsWritten = false;
+	if (debugEnabled_ && writeClouds_ && !cloudsWritten)
+	{
+		std::string outputDir = GraspingUtils::getOutputPath();
+		Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
+		pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
+		cloudsWritten =  true;
+	}
+
+
+	// Reset control variables
+	mutex.lock();
+	state = STATE_IDLE;
+	receivedCloud = pcl::PointCloud<pcl::PointXYZ>::Ptr();
+	mutex.unlock();
 }
 
 
@@ -331,7 +367,7 @@ int main(int argn_, char **argv_)
 
 
 	/********** Start spinning **********/
-	ros::AsyncSpinner spinner(2);
+	ros::AsyncSpinner spinner(3);
 	spinner.start();
 
 
@@ -379,6 +415,16 @@ int main(int argn_, char **argv_)
 	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
 
 
-	ros::waitForShutdown();
+	// Spin at 20 Hz
+	ros::Rate r(20);
+	while (ros::ok())
+	{
+		if (receivedCloud)
+			labelCloud(voxelSize, clippingPlaneZ, debugEnabled, writeClouds);
+		r.sleep();
+	}
+
+
+	ros::shutdown();
 	return EXIT_SUCCESS;
 }
