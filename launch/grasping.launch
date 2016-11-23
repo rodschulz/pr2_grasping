@@ -1,4 +1,9 @@
 <launch>
+	<env name="ROSCONSOLE_FORMAT" value="[${severity}][${node}]: ${message}" />
+	<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
+	<env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find pr2_grasping)/models" />
+
+	<!-- run grasping node -->
 	<node name="pr2_grasper" pkg="pr2_grasping" type="pr2_grasper" output="screen" respawn="true"/>
 
 	<!-- launch RViz if asked -->
