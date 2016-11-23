@@ -22,8 +22,8 @@
 #include <deque>
 #include <iostream>
 #include <fstream>
-#include <opencv2/ml/ml.hpp>
 #include "Config.hpp"
+#include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
 #include "RobotUtils.hpp"
 #include "GazeboUtils.hpp"
@@ -34,8 +34,8 @@
 #define ANGLE_SPLIT_NUM		4
 #define ANGLE_STEP			M_PI / ANGLE_SPLIT_NUM
 
-typedef boost::shared_ptr<CvSVM> CvSVMPtr;
 
+/***** Enumeration defining the possible states for the gripper *****/
 enum GripperState
 {
 	STATE_IDLE,
@@ -334,6 +334,87 @@ void timerCallback(const ros::TimerEvent &event_)
 
 
 /**************************************************/
+std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const EffectorSide &side_,
+		const bool debugEnabled_,
+		std::vector<geometry_msgs::PoseStamped> &DEBUG_points_)
+{
+	// Number of grasping points processed
+	static int pointIdx = 0;
+
+	std::vector<std::pair<moveit_msgs::Grasp, float> > grasps;
+	DEBUG_points_.clear();
+
+	if (classifier)
+	{
+		ROS_INFO("...using classifier");
+		size_t npoints = queue.front().graspingPoints.size();
+
+		for (size_t i = 0; i < npoints; i++)
+		{
+			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+
+			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+			{
+				int label = point.label;
+				float angle = j * ANGLE_STEP;
+
+				cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
+				sample.at<float>(0, 0) = label;
+				sample.at<float>(0, 1) = angle;
+				float distance = classifier->predict(sample, true);
+				float cls = classifier->predict(sample, false);
+				bool usePoint = abs(cls - 1) < 1E-8;
+
+				ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label, angle, distance, usePoint ? "TRUE" : "FALSE", cls);
+
+				if (usePoint)
+				{
+					geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
+					std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
+					moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+
+					grasps.push_back(make_pair(grasp, angle));
+				}
+			}
+		}
+
+		ROS_INFO("...predicted %zu grasps", grasps.size());
+	}
+	else
+	{
+		ROS_INFO("...sweeping point-angle space");
+
+		size_t npoints = queue.front().graspingPoints.size();
+		for (size_t i = 0; i < npoints; i++)
+		{
+			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+
+			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+			{
+				// Synthesize the actual grasp
+				float angle = j * ANGLE_STEP;
+				geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
+				std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
+				moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+
+				grasps.push_back(make_pair(grasp, angle));
+
+				/***** FOR DEBUG ONLY *****/
+				geometry_msgs::PoseStamped gp = graspingPose;
+				gp.pose.position = point.position;
+				DEBUG_points_.push_back(gp);
+			}
+
+			pointIdx++;
+		}
+		ROS_INFO("...synthesized %zu grasps", grasps.size());
+	}
+
+	return grasps;
+}
+
+
+/**************************************************/
 void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *planningScene_,
 					 MoveGroupPtr &effector_,
 					 const EffectorSide &side_,
@@ -341,8 +422,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 {
 	// Number of sets of grasping points processed so far
 	static int nsets = 0;
-	// Number of grasping points processed
-	static int pointIdx = 0;
 
 	// Process data until empty
 	while (!queue.empty())
@@ -358,44 +437,8 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		/*********************************************************/
 		/********** STAGE 2: generate points to grasp ************/
 		/*********************************************************/
-		std::vector<moveit_msgs::Grasp> grasps;
 		std::vector<geometry_msgs::PoseStamped> DEBUG_points; // for debug only
-		std::vector<float> DEBUG_angles; // for debug only
-		if (classifier)
-		{
-			ROS_INFO("...using classifier");
-
-			// USE THE CLASSIFIER TO GENERATE GRASPING POINTS!
-		}
-		else
-		{
-			ROS_INFO("...sweeping point-angle space");
-
-			size_t npoints = queue.front().graspingPoints.size();
-			for (size_t i = 0; i < npoints; i++)
-			{
-				pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
-
-				for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
-				{
-					// Synthesize the actual grasp
-					geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, j * ANGLE_STEP);
-					std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
-					moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
-
-					grasps.push_back(grasp);
-
-					/***** FOR DEBUG ONLY *****/
-					geometry_msgs::PoseStamped gp = graspingPose;
-					gp.pose.position = point.position;
-					DEBUG_points.push_back(gp);
-					DEBUG_angles.push_back(j * ANGLE_STEP);
-				}
-
-				pointIdx++;
-			}
-			ROS_INFO("...synthesized %zu grasps", grasps.size());
-		}
+		std::vector<std::pair<moveit_msgs::Grasp, float> > grasps = generateGrasps(side_, debugEnabled_, DEBUG_points);
 
 
 		/*********************************************************/
@@ -405,7 +448,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		for (size_t i = 0; i < ngrasps; i++)
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
-			moveit_msgs::Grasp grasp = grasps[i];
+			moveit_msgs::Grasp grasp = grasps[i].first;
 			ROS_DEBUG("grasp id: %s", grasp.id.c_str());
 
 
@@ -540,7 +583,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 
 			/********** Store the result **********/
-			IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, DEBUG_angles[i], ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
+			IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, grasps[i].second, ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
 
 
 			/********** Restore back everything **********/
@@ -570,12 +613,10 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		/*********************************************************/
 		/*** STAGE 4: send a signal and remove processed data ****/
 		/*********************************************************/
-
 		// Publish the number of grasping point sets processed so far
 		std_msgs::Int32 sets;
 		sets.data = ++nsets;
 		statusPub.publish(sets);
-		// ros::Duration(0.5).sleep();
 
 		// Remove the processed grasping data
 		ROS_DEBUG("Removing processed grasping data");
@@ -654,38 +695,6 @@ int main(int _argn, char **_argv)
 		classifier = CvSVMPtr(new CvSVM());
 		classifier->load(location.c_str());
 	}
-
-
-	// cv::Mat output;
-	// cv::Mat input = cv::Mat::zeros(10, 2, CV_32FC1);
-	// input.at<float>(0, 0) = 5;
-	// input.at<float>(0, 1) = 0.7853982;
-	// input.at<float>(1, 0) = 1;
-	// input.at<float>(1, 1) = 0.123;
-	// input.at<float>(2, 0) = 3;
-	// input.at<float>(2, 1) = 0.5245;
-	// input.at<float>(3, 0) = 5;
-	// input.at<float>(3, 1) = 0.762;
-	// input.at<float>(4, 0) = 6;
-	// input.at<float>(4, 1) = 2.54;
-	// input.at<float>(5, 0) = 7;
-	// input.at<float>(5, 1) = 3.3234;
-	// input.at<float>(6, 0) = 7;
-	// input.at<float>(6, 1) = 0.7853982;
-	// input.at<float>(7, 0) = 7;
-	// input.at<float>(7, 1) = 0.7853982;
-	// input.at<float>(8, 0) = 0;
-	// input.at<float>(8, 1) = 1.453453;
-	// input.at<float>(9, 0) = 1;
-	// input.at<float>(9, 1) = 0.2;
-
-	// ROS_DEBUG_STREAM("predicting");
-	// classifier->predict(input, output);
-	// ROS_INFO_STREAM("input\n" << input << std::endl);
-	// ROS_INFO_STREAM("output\n" << output << std::endl);
-
-	// return 0;
-
 
 
 	/********** Setup control group **********/
