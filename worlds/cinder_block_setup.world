@@ -19,14 +19,12 @@
 		<include>
 			<uri>model://cinder_block</uri>
 			<name>cinder_block</name>
-			<pose>0.76 0 0.8 0 0 -1.57079632679</pose>
+			<pose>0.76 0 0.8 0 0 -1.57</pose>
 		</include>
-
 		<!-- Shadows disabled -->
 		<scene>
 			<shadows>0</shadows>
 		</scene>
-
 		<!-- Camera position -->
 		<gui>
 			<camera name="camera1">

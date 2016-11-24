@@ -21,12 +21,10 @@
 			<name>saucepan</name>
 			<pose>0.62 0.2 0.8 0 0 -1.57079632679</pose>
 		</include>
-
 		<!-- Shadows disabled -->
 		<scene>
 			<shadows>0</shadows>
 		</scene>
-
 		<!-- Camera position -->
 		<gui>
 			<camera name="camera1">

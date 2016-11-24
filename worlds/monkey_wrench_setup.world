@@ -19,14 +19,12 @@
 		<include>
 			<uri>model://monkey_wrench</uri>
 			<name>monkey_wrench</name>
-			<pose>0.75 0 0.64 0.097223 0.019500 -1.57079632679</pose>
+			<pose>0.75 0 0.64 0 0 0</pose>
 		</include>
-
 		<!-- Shadows disabled -->
 		<scene>
 			<shadows>0</shadows>
 		</scene>
-
 		<!-- Camera position -->
 		<gui>
 			<camera name="camera1">
