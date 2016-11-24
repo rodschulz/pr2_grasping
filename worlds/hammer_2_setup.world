@@ -19,14 +19,12 @@
 		<include>
 			<uri>model://hammer</uri>
 			<name>hammer_2</name>
-			<pose>0.67 0 0.532 1.607972 1.430606 1.620333</pose>
+			<pose>0.68 0 0.7 0 0 1.57</pose>
 		</include>
-
 		<!-- Shadows disabled -->
 		<scene>
 			<shadows>0</shadows>
 		</scene>
-
 		<!-- Camera position -->
 		<gui>
 			<camera name="camera1">

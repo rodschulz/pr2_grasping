@@ -1,24 +1,68 @@
 <?xml version="1.0"?>
 <sdf version="1.4">
-  <model name="hammer">
-    <!-- <static>true</static> -->
-    <link name="link">
-
-      <collision name="collision">
-        <geometry>
-          <mesh>
-            <uri>model://hammer/meshes/hammer.dae</uri>
-          </mesh>
-        </geometry>
-      </collision>
-
-      <visual name="visual">
-        <geometry>
-          <mesh>
-            <uri>model://hammer/meshes/hammer.dae</uri>
-          </mesh>
-        </geometry>
-      </visual>
-    </link>
-  </model>
+	<model name="hammer">
+		<static>false</static>
+		<link name="link">
+			<pose>0 0 0 0 0 0</pose>
+			<inertial>
+				<mass>0.390</mass>
+				<inertia>
+					<ixx>0.00058</ixx>
+					<ixy>0</ixy>
+					<ixz>0</ixz>
+					<iyy>0.00058</iyy>
+					<iyz>0</iyz>
+					<izz>0.00019</izz>
+				</inertia>
+			</inertial>
+			<collision name="shaft">
+				<pose>0 0 0 0 0 0</pose>
+				<geometry>
+					<cylinder>
+						<radius>0.015</radius>
+						<length>0.2</length>
+					</cylinder>
+				</geometry>
+			</collision>
+			<visual name="visual_shaft">
+				<pose>0 0 0 0 0 0</pose>
+				<geometry>
+					<cylinder>
+						<radius>0.015</radius>
+						<length>0.2</length>
+					</cylinder>
+				</geometry>
+				<material>
+					<script>
+						<uri>file://media/materials/scripts/gazebo.material</uri>
+						<name>Gazebo/Wood</name>
+					</script>
+				</material>
+			</visual>
+			<collision name="head">
+				<pose>0 0 0.1 1.57 0 0</pose>
+				<geometry>
+					<cylinder>
+						<radius>0.02</radius>
+						<length>0.1</length>
+					</cylinder>
+				</geometry>
+			</collision>
+			<visual name="visual_head">
+				<pose>0 0 0.1 1.57 0 0</pose>
+				<geometry>
+					<cylinder>
+						<radius>0.02</radius>
+						<length>0.1</length>
+					</cylinder>
+				</geometry>
+				<material>
+					<script>
+						<uri>file://media/materials/scripts/gazebo.material</uri>
+						<name>Gazebo/Grey</name>
+					</script>
+				</material>
+			</visual>
+		</link>
+	</model>
 </sdf>
