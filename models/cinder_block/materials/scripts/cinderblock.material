@@ -1,0 +1,15 @@
+material CinderBlock/Diffuse
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture cinder_block_diffuse.png
+        filtering anistropic
+        max_anisotropy 16
+      }
+    }
+  }
+}
