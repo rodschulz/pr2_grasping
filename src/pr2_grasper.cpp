@@ -158,7 +158,7 @@ std::vector<moveit_msgs::CollisionObject> genCollisions(const bool debugEnabled_
 	float colX = (minPt_.point.x + maxPt_.point.x) * 0.5;
 	float colY = (minPt_.point.y + maxPt_.point.y) * 0.5;
 	float colZ = (minPt_.point.z + maxPt_.point.z) * 0.5;
-	geometry_msgs::Pose targetPose = GraspingUtils::genPose(colX, colY, colZ);
+	geometry_msgs::Pose targetPose = GraspingUtils::genPose(colX, colY, colZ + 0.01); // lift the object a bit to avoid collisions with the support
 
 	if (debugEnabled_)
 	{
@@ -374,8 +374,15 @@ std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const Effector
 					moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
 					grasps.push_back(make_pair(grasp, angle));
+
+					/***** FOR DEBUG ONLY *****/
+					geometry_msgs::PoseStamped gp = graspingPose;
+					gp.pose.position = point.position;
+					DEBUG_points_.push_back(gp);
 				}
 			}
+
+			pointIdx++;
 		}
 
 		ROS_INFO("...predicted %zu grasps", grasps.size());
@@ -513,53 +520,11 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 				ros::Duration(2).sleep();
 
 
-				// ROS_INFO("Removing support collision");
-				// std::vector<std::string> ids;
-				// ids.push_back(OBJECT_SUPPORT);
-				// planningScene_->removeCollisionObjects(ids);
-				// ros::Duration(2).sleep();
-
-
-				// ROS_INFO("...attaching grasped object");
-				// std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
-				// std::vector<std::string> allowedTouch;
-				// allowedTouch.push_back(prefix + "_forearm_roll_link");
-				// allowedTouch.push_back(prefix + "_forearm_link");
-				// allowedTouch.push_back(prefix + "_wrist_flex_link");
-				// allowedTouch.push_back(prefix + "_wrist_roll_link");
-				// allowedTouch.push_back(prefix + "_gripper_palm_link");
-				// allowedTouch.push_back(prefix + "_gripper_r_finger_link");
-				// allowedTouch.push_back(prefix + "_gripper_r_finger_tip_link");
-				// allowedTouch.push_back(prefix + "_gripper_l_finger_link");
-				// allowedTouch.push_back(prefix + "_gripper_l_finger_tip_link");
-				// allowedTouch.push_back(OBJECT_SUPPORT);
-				// effector_->attachObject(OBJECT_TARGET, "", allowedTouch);
-
-
-				// geometry_msgs::PoseStamped xx;
-				// xx.header.frame_id = FRAME_BASE;
-				// xx.pose.position.x = 0.4;
-				// xx.pose.position.y = -0.4;
-				// xx.pose.position.z = 0.7;
-				// effector_->setPoseTarget(xx);
-				// if (!RobotUtils::move(effector_, 10))
-				// {
-				// 	ROS_INFO("FUCK!!!");
-				// }
-
-
-
-
-
-
-
-
 				// Detach so the object can be 'seen'
 				ROS_INFO("...detaching object for evaluation");
 				effector_->detachObject(OBJECT_TARGET);
-				// ROS_INFO("...attaching grasped object");
-				// effector_->attachObject(OBJECT_TARGET);
 				ros::Duration(0.5).sleep();
+
 
 				// Call the evaluation node
 				ROS_INFO("...evaluating result");
@@ -567,10 +532,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 					ros::Duration(0.5).sleep();
 
 				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
-
-
-				// ROS_INFO("...detaching object for evaluation");
-				// effector_->detachObject(OBJECT_TARGET);
 			}
 			else
 				ROS_INFO("...attempt failed, skipping evaluation");
@@ -606,7 +567,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			pr2_grasping::GazeboSetup setup;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
 				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
-			// ros::Duration(2).sleep();
 		}
 
 

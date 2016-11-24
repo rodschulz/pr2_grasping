@@ -150,6 +150,10 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	effector_->stop();
 	ros::Duration(0.5).sleep();
 
+	ROS_INFO("...detaching object for evaluation");
+	effector_->detachObject(OBJECT_TARGET);
+	ros::Duration(0.5).sleep();
+
 
 	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, 1));
 	Eigen::Quaternionf incremental = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(0, 1, 0), Eigen::Vector3f(0, 0, -1));
@@ -158,8 +162,8 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	geometry_msgs::PoseStamped evalPose;
 	evalPose.header.frame_id = FRAME_BASE;
 	evalPose.pose.position.x = object_.find("x")->second;
-	evalPose.pose.position.y = object_.find("y")->second;;
-	evalPose.pose.position.z = object_.find("z")->second;;
+	evalPose.pose.position.y = object_.find("y")->second;
+	evalPose.pose.position.z = object_.find("z")->second;
 
 
 	// Publish evaluation status
@@ -207,18 +211,17 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		evaluateCloud = true;
 		mutex.unlock();
 
-
 		// Publish evaluation status
 		stMsg.status = pr2_grasping::EvaluationStatus::PERFORMING_NEW_EVAL;
 		statusPub.publish(stMsg);
 		ros::Duration(0.5).sleep();
-
 
 		// Wait until the pose was evaluated
 		size_t current = status.size();
 		ROS_DEBUG_STREAM("Testing gripper pose " << current);
 		while (current == status.size())
 			ros::Duration(1.0).sleep();
+
 
 		// Check early finish
 		if (countTrue(status) >= successThreshold_)
