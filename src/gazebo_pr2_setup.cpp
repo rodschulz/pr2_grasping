@@ -14,7 +14,7 @@
 #include <yaml-cpp/node/parse.h>
 #include <yaml-cpp/node/impl.h>
 #include "Config.hpp"
-#include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include "GazeboUtils.hpp"
 #include "RobotUtils.hpp"
 
@@ -140,7 +140,7 @@ void moveHead()
 						 Config::get()["setup"]["headTarget"]["z"].as<float>(0.5),
 						 FRAME_BASE);
 
-	ros::Duration(2).sleep();
+	// ros::Duration(1).sleep();
 	ROS_INFO("...head moved");
 }
 
@@ -189,7 +189,7 @@ bool resetObject()
 		ROS_WARN_STREAM("Can't reset state of model '" << supportObject.first << "'");
 		resetOk = false;
 	}
-	ros::Duration(2.0).sleep();
+	ros::Duration(1.0).sleep();
 	if (!GazeboUtils::setModelState(trackedObject.first, trackedObject.second, "world"))
 	{
 		ROS_WARN_STREAM("Can't reset state of model '" << trackedObject.first << "'");
@@ -244,8 +244,8 @@ int main(int argn_, char** argv_)
 
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(GraspingUtils::getConfigPath()))
-		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+	if (!Config::load(PkgUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + PkgUtils::getConfigPath());
 
 	bool debugEnabled = Config::get()["setupDebug"].as<bool>();
 	displacementThreshold = Config::get()["setup"]["displacementThreshold"].as<float>();

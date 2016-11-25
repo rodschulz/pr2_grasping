@@ -3,7 +3,7 @@
  * 2016
  */
 #include "IO.hpp"
-#include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include <iostream>
 #include <fstream>
 
@@ -18,9 +18,9 @@ void IO::saveResults(const std::string &targetObject_,
 					 const moveit_msgs::Grasp &grasp_,
 					 const moveit::planning_interface::MoveItErrorCode &errCode_)
 {
-	std::string filename = GraspingUtils::getOutputPath() +
+	std::string filename = PkgUtils::getOutputPath() +
 						   targetObject_ + "_" +
-						   GraspingUtils::getTimestamp("%Y-%m-%d_%H%M%S") + ".yaml";
+						   PkgUtils::getTimestamp("%Y-%m-%d_%H%M%S") + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
 

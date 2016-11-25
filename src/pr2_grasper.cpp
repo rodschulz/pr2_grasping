@@ -25,6 +25,7 @@
 #include "Config.hpp"
 #include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include "RobotUtils.hpp"
 #include "GazeboUtils.hpp"
 #include "IO.hpp"
@@ -43,6 +44,11 @@ enum GripperState
 	STATE_STUCK
 };
 
+// enum ArmState
+// {
+// 	ARM_GOAL_ABORT,
+// };
+
 /***** Global variables *****/
 ros::Publisher posePub, cancelPub, scenePub, statusPub;
 boost::mutex pmutex, gmutex;
@@ -53,6 +59,8 @@ GripperState gState = STATE_IDLE;
 std::string trackedObject = "";
 std::string supportObject = "";
 CvSVMPtr classifier = CvSVMPtr();
+
+bool armGoalAbort = false;
 
 /***** Debug variables *****/
 ros::Publisher collisionPub, graspingPointPub;
@@ -462,7 +470,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			ROS_INFO("...clearing scene");
 			moveit_msgs::PlanningSceneWorld cleanScene;
 			scenePub.publish(cleanScene);
-			ros::Duration(1).sleep();
+			// ros::Duration(1).sleep();
 
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
@@ -489,12 +497,13 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			for (int att = 0;
 					att < maxAttempts &&
 					code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
-					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED ;
+					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+					!armGoalAbort;
 					att++)
 			{
 				ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
 				code = effector_->pick(OBJECT_TARGET, grasp);
-				ROS_INFO(".....finished with code: %d (attempt %d of %d)", code.val, att + 1, maxAttempts);
+				ROS_INFO(".....finished: %d / %s (attempt %d of %d)", code.val, PkgUtils::toString(code).c_str(), att + 1, maxAttempts);
 			}
 
 
@@ -506,18 +515,20 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			bool attemptCompleted = false;
 			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
 					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
-					 gState == STATE_STUCK))
+					 gState == STATE_STUCK) ||
+					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+					 armGoalAbort))
 			{
 				attemptCompleted = true;
 
 				// Move the support object so it doesn't obstructs the evaluation
-				ROS_INFO("Setting table pose");
-				geometry_msgs::Pose auxPose;
-				auxPose.position.x = 4;
-				while (!GazeboUtils::setModelState(supportObject, auxPose, "world"))
-					ros::Duration(1).sleep();
-				ROS_INFO("Table pose set");
-				ros::Duration(2).sleep();
+				// ROS_INFO("Setting table pose");
+				// geometry_msgs::Pose auxPose;
+				// auxPose.position.x = 4;
+				// while (!GazeboUtils::setModelState(supportObject, auxPose, "world"))
+				// 	ros::Duration(1).sleep();
+				// ROS_INFO("Table pose set");
+				// ros::Duration(2).sleep();
 
 
 				// Detach so the object can be 'seen'
@@ -624,6 +635,25 @@ void gripperStuckCallback(const std_msgs::Bool &msg_)
 
 
 /**************************************************/
+void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &msg_)
+{
+	// ROS_DEBUG("Arm status: %d -- result: %d ", msg_.status.status, msg_.result.error_code);
+	ROS_DEBUG("Arm status: %s -- Arm result: %s ", PkgUtils::toString(msg_.status).c_str(), PkgUtils::toString(msg_.result).c_str());
+
+	bool actionAborted = msg_.status.status == actionlib_msgs::GoalStatus::ABORTED;
+	bool goalViolation = (msg_.result.error_code == control_msgs::FollowJointTrajectoryResult::PATH_TOLERANCE_VIOLATED) ||
+						 (msg_.result.error_code == control_msgs::FollowJointTrajectoryResult::GOAL_TOLERANCE_VIOLATED);
+
+	if (actionAborted && goalViolation)
+		armGoalAbort = true;
+	else
+		armGoalAbort = false;
+
+	ROS_DEBUG("armGoalAbort: %s", armGoalAbort ? "TRUE" : "FALSE");
+}
+
+
+/**************************************************/
 int main(int _argn, char **_argv)
 {
 	ros::init(_argn, _argv, "pr2_grasper");
@@ -638,8 +668,8 @@ int main(int _argn, char **_argv)
 
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(GraspingUtils::getConfigPath()))
-		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+	if (!Config::load(PkgUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + PkgUtils::getConfigPath());
 
 	// Get the params
 	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
@@ -660,7 +690,6 @@ int main(int _argn, char **_argv)
 	/********** Setup control group **********/
 	ROS_INFO("Setting effector control");
 	std::string arm = Config::get()["grasper"]["arm"].as<std::string>();
-	EffectorSide side = RobotUtils::getEffectorSide(arm);
 	std::pair<std::string, std::string> effectorNames = RobotUtils::getEffectorNames(arm);
 	MoveGroupPtr effector = MoveGroupPtr(new moveit::planning_interface::MoveGroup(effectorNames.first));
 	effector->setEndEffector(effectorNames.second);
@@ -680,7 +709,8 @@ int main(int _argn, char **_argv)
 	scenePub = handler.advertise<moveit_msgs::PlanningSceneWorld>("/planning_scene_world", 1);
 
 	ros::Subscriber pointsSub = handler.subscribe("/pr2_grasping/grasping_data", 1, graspingPointsCallback);
-	ros::Subscriber stuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
+	ros::Subscriber gripperStuckSub = handler.subscribe("/pr2_grasping/gripper_action_stuck", 1, gripperStuckCallback);
+	ros::Subscriber armAbortSub = handler.subscribe(RobotUtils::getArmTopic(arm) + "/result", 1, armAbortedCallback);
 
 	if (debugEnabled)
 	{
@@ -720,6 +750,7 @@ int main(int _argn, char **_argv)
 	ros::Timer timer = handler.createTimer(ros::Duration(2), timerCallback);
 
 	// Spin at 10 Hz
+	EffectorSide side = RobotUtils::getEffectorSide(arm);
 	ros::Rate r(10);
 	while (ros::ok())
 	{

@@ -12,13 +12,14 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include "RobotUtils.hpp"
-#include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include "Config.hpp"
 
 
 #define TIME_WINDOW			5
+#define TIME_WINDOW_STEADY	1
 #define POS_STD_THRES		0.0005
-#define EFFORT_STD_THRES	0.2
+#define EFFORT_STD_THRES	0.23
 
 
 /***** Accumulators type definition *****/
@@ -28,6 +29,7 @@ typedef boost::accumulators::accumulator_set<double, boost::accumulators::stats<
 boost::mutex mutex;
 std::list<control_msgs::GripperCommandActionFeedback> feedback;
 std::list< std::pair<AccType, AccType> > acc;
+std::pair<bool, ros::Time> steadyBegin = std::make_pair(false, ros::Time());
 
 
 /**************************************************/
@@ -58,11 +60,27 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 
 
 	ros::Duration elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
-	if (elapsed.toSec() > TIME_WINDOW && posStdDev < POS_STD_THRES && effortStdDev < EFFORT_STD_THRES)
+	if (elapsed.toSec() > TIME_WINDOW &&
+			posStdDev < POS_STD_THRES &&
+			effortStdDev < EFFORT_STD_THRES)
 	{
-		std_msgs::Bool stuckMsg;
-		stuckMsg.data = true;
-		stuckPublisher_.publish(stuckMsg);
+		if (!steadyBegin.first)
+		{
+			steadyBegin.second = feedback.back().header.stamp;
+			steadyBegin.first = true;
+		}
+		else
+		{
+			ros::Duration steadyTime = feedback.back().header.stamp - steadyBegin.second;
+			if (steadyTime.toSec() >= TIME_WINDOW_STEADY)
+			{
+				std_msgs::Bool stuckMsg;
+				stuckMsg.data = true;
+				stuckPublisher_.publish(stuckMsg);
+
+				steadyBegin.first = false;
+			}
+		}
 	}
 
 	// Remove old stuff
@@ -101,8 +119,8 @@ int main(int argn_, char **argv_)
 
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(GraspingUtils::getConfigPath()))
-		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+	if (!Config::load(PkgUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + PkgUtils::getConfigPath());
 
 	if (Config::get()["gmonitorDebug"].as<bool>())
 	{

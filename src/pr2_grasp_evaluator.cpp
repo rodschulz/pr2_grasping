@@ -15,6 +15,7 @@
 #include <boost/signals2/mutex.hpp>
 #include "Config.hpp"
 #include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include "RobotUtils.hpp"
 
 
@@ -170,7 +171,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	pr2_grasping::EvaluationStatus stMsg;
 	stMsg.status = pr2_grasping::EvaluationStatus::BEFORE_EVAL;
 	statusPub.publish(stMsg);
-	ros::Duration(0.5).sleep();
+	// ros::Duration(0.5).sleep();
 
 
 	// Iterate testing a set of poses to evaluate the grasping result
@@ -202,8 +203,8 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 
 		// Point the head to the evaluation pose
-		RobotUtils::moveHead(0, 0, 0, RobotUtils::getEffectorFrame(effectorName));
-		ros::Duration(0.5).sleep();
+		RobotUtils::moveHead(0, 0, 0, RobotUtils::getEffectorFrame(effectorName), ros::Duration(15));
+		// ros::Duration(0.5).sleep();
 
 
 		// Schedule the evaluation over the point clouds
@@ -214,7 +215,7 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		// Publish evaluation status
 		stMsg.status = pr2_grasping::EvaluationStatus::PERFORMING_NEW_EVAL;
 		statusPub.publish(stMsg);
-		ros::Duration(0.5).sleep();
+		// ros::Duration(0.5).sleep();
 
 		// Wait until the pose was evaluated
 		size_t current = status.size();
@@ -263,8 +264,8 @@ int main(int argn_, char** argv_)
 
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(GraspingUtils::getConfigPath()))
-		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+	if (!Config::load(PkgUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + PkgUtils::getConfigPath());
 
 	bool debugEnabled = Config::get()["evaluatorDebug"].as<bool>();
 	std::map<std::string, float> clippingX = Config::get()["evaluator"]["clippingX"].as<std::map<std::string, float> >();

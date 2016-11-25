@@ -22,6 +22,7 @@
 #include "Calculator.hpp"
 #include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
+#include "PkgUtils.hpp"
 #include "RobotUtils.hpp"
 #include "Writer.hpp"
 
@@ -343,7 +344,7 @@ void labelCloud(const float voxelSize_,
 	static bool cloudsWritten = false;
 	if (debugEnabled_ && writeClouds_ && !cloudsWritten)
 	{
-		std::string outputDir = GraspingUtils::getOutputPath();
+		std::string outputDir = PkgUtils::getOutputPath();
 		Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
 		cloudsWritten =  true;
@@ -373,8 +374,8 @@ int main(int argn_, char **argv_)
 
 	/********** Load the node's configuration **********/
 	ROS_INFO("Loading %s config", ros::this_node::getName().c_str());
-	if (!Config::load(GraspingUtils::getConfigPath()))
-		throw std::runtime_error((std::string) "Error reading config at " + GraspingUtils::getConfigPath());
+	if (!Config::load(PkgUtils::getConfigPath()))
+		throw std::runtime_error((std::string) "Error reading config at " + PkgUtils::getConfigPath());
 
 	bool debugEnabled = Config::get()["labelerDebug"].as<bool>();
 	float voxelSize = Config::get()["labeler"]["voxelSize"].as<float>();
