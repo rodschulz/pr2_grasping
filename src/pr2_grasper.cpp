@@ -305,24 +305,32 @@ void releaseObject(MoveGroupPtr &effector_,
 	current.pose.orientation.z = rotation.z();
 	effector_->setPoseTarget(current);
 
-	if (!RobotUtils::move(effector_, 25))
-		ROS_WARN("Unable to move gripper to release pose. Attempting release 'as is'");
+	if (!RobotUtils::move(effector_, 10))
+	{
+		ROS_WARN("Unable to move gripper for release. Clearing scene and retrying");
 
+		moveit_msgs::PlanningSceneWorld cleanScene;
+		scenePub.publish(cleanScene);
+		ros::Duration(0.5).sleep();
 
-	ROS_INFO(".....detaching aux collision");
-	effector_->detachObject(OBJECT_FAKE_AUX);
-	ros::Duration(0.5).sleep();
+		if (!RobotUtils::move(effector_, 5))
+			ROS_WARN("Unable to move gripper, releasing 'as is'");
+	}
+	else
+	{
+		ROS_INFO(".....detaching aux collision");
+		effector_->detachObject(OBJECT_FAKE_AUX);
+		ros::Duration(0.5).sleep();
 
-	ROS_INFO(".....removing aux collision");
-	std::vector<std::string> ids;
-	ids.push_back(OBJECT_FAKE_AUX);
-	planningScene_->removeCollisionObjects(ids);
-	ros::Duration(0.5).sleep();
-
+		ROS_INFO(".....removing aux collision");
+		std::vector<std::string> ids;
+		ids.push_back(OBJECT_FAKE_AUX);
+		planningScene_->removeCollisionObjects(ids);
+		ros::Duration(0.5).sleep();
+	}
 
 	ROS_INFO(".....opening gripper");
 	RobotUtils::moveGripper(effector_->getName(), 1);
-
 
 	ROS_INFO(".....release action completed");
 }
@@ -470,7 +478,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			ROS_INFO("...clearing scene");
 			moveit_msgs::PlanningSceneWorld cleanScene;
 			scenePub.publish(cleanScene);
-			// ros::Duration(1).sleep();
+			ros::Duration(1).sleep();
 
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
@@ -495,15 +503,16 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			int maxAttempts = 10;
 			moveit::planning_interface::MoveItErrorCode code;
 			for (int att = 0;
-					att < maxAttempts &&
-					code.val != moveit_msgs::MoveItErrorCodes::SUCCESS &&
-					code.val != moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
-					!armGoalAbort;
+					att < maxAttempts && code.val != moveit_msgs::MoveItErrorCodes::SUCCESS;
 					att++)
 			{
 				ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
 				code = effector_->pick(OBJECT_TARGET, grasp);
 				ROS_INFO(".....finished: %d / %s (attempt %d of %d)", code.val, PkgUtils::toString(code).c_str(), att + 1, maxAttempts);
+
+				// Break if there was an abort, but wasn't the arm controller
+				if (code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && !armGoalAbort)
+					break;
 			}
 
 
@@ -521,26 +530,20 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			{
 				attemptCompleted = true;
 
-				// Move the support object so it doesn't obstructs the evaluation
-				// ROS_INFO("Setting table pose");
-				// geometry_msgs::Pose auxPose;
-				// auxPose.position.x = 4;
-				// while (!GazeboUtils::setModelState(supportObject, auxPose, "world"))
-				// 	ros::Duration(1).sleep();
-				// ROS_INFO("Table pose set");
-				// ros::Duration(2).sleep();
-
-
 				// Detach so the object can be 'seen'
-				ROS_INFO("...detaching object for evaluation");
-				effector_->detachObject(OBJECT_TARGET);
-				ros::Duration(0.5).sleep();
-
+				// ROS_INFO("...detaching object for evaluation");
+				// effector_->detachObject(OBJECT_TARGET);
+				// ros::Duration(0.5).sleep();
 
 				// Call the evaluation node
 				ROS_INFO("...evaluating result");
 				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
-					ros::Duration(0.5).sleep();
+				{
+					ROS_WARN("...clearing scene for evaluation");
+					moveit_msgs::PlanningSceneWorld cleanScene;
+					scenePub.publish(cleanScene);
+					// ros::Duration(0.5).sleep();
+				}
 
 				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
 			}
