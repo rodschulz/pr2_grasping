@@ -171,7 +171,6 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	pr2_grasping::EvaluationStatus stMsg;
 	stMsg.status = pr2_grasping::EvaluationStatus::BEFORE_EVAL;
 	statusPub.publish(stMsg);
-	// ros::Duration(0.5).sleep();
 
 
 	// Iterate testing a set of poses to evaluate the grasping result
@@ -197,15 +196,12 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 		if (!RobotUtils::move(effector_, maxRetries_))
 		{
-			ROS_WARN("Unable to move gripper for grasp evaluation, aborting");
+			ROS_WARN("Unable to move gripper for evaluation, aborting");
 			return false;
 		}
 
-
 		// Point the head to the evaluation pose
 		RobotUtils::moveHead(0, 0, 0, RobotUtils::getEffectorFrame(effectorName), ros::Duration(15));
-		// ros::Duration(0.5).sleep();
-
 
 		// Schedule the evaluation over the point clouds
 		mutex.lock();
@@ -215,7 +211,6 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 		// Publish evaluation status
 		stMsg.status = pr2_grasping::EvaluationStatus::PERFORMING_NEW_EVAL;
 		statusPub.publish(stMsg);
-		// ros::Duration(0.5).sleep();
 
 		// Wait until the pose was evaluated
 		size_t current = status.size();
@@ -239,7 +234,6 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 	// Publish evaluation status
 	stMsg.status = pr2_grasping::EvaluationStatus::AFTER_EVAL;
 	statusPub.publish(stMsg);
-	ros::Duration(0.5).sleep();
 
 
 	ROS_DEBUG_STREAM("Positive tested poses: " << count);
