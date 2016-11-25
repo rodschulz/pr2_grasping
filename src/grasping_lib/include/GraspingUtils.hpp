@@ -10,11 +10,6 @@
 #include <pcl/point_types.h>
 
 
-#define PACKAGE_NAME		"pr2_grasping"
-#define PKG_CONFIG_DIR		"config"
-#define PKG_OUTPUT_DIR		"output"
-
-
 #define OBJECT_TARGET		"object_target"
 #define OBJECT_SUPPORT		"object_support"
 #define GRASP_ID			"grasp_"
@@ -33,12 +28,6 @@ enum ClippingAxis
 class GraspingUtils
 {
 public:
-	/**************************************************/
-	static std::string getConfigPath();
-
-	/**************************************************/
-	static std::string getOutputPath();
-
 	/**************************************************/
 	static bool getTransformation(tf::StampedTransform &transform_,
 								  const tf::TransformListener *tfListener_,
@@ -74,10 +63,6 @@ public:
 									   const float dirx_ = 1,
 									   const float diry_ = 0,
 									   const float dirz_ = 0);
-
-	/**************************************************/
-	static std::string getTimestamp(const std::string &format_);
-
 
 private:
 	// Constructor
