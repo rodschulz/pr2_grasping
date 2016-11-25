@@ -18,8 +18,8 @@
 
 #define TIME_WINDOW			5
 #define TIME_WINDOW_STEADY	1
-#define POS_STD_THRES		0.0005
-#define EFFORT_STD_THRES	0.23
+#define POS_STD_THRES		1E-5
+#define EFFORT_STD_THRES	1E-2
 
 
 /***** Accumulators type definition *****/
@@ -29,7 +29,8 @@ typedef boost::accumulators::accumulator_set<double, boost::accumulators::stats<
 boost::mutex mutex;
 std::list<control_msgs::GripperCommandActionFeedback> feedback;
 std::list< std::pair<AccType, AccType> > acc;
-std::pair<bool, ros::Time> steadyBegin = std::make_pair(false, ros::Time());
+std::list< std::pair<AccType, AccType> > stdAcc;
+std::pair<bool, ros::Time> steady = std::make_pair(false, ros::Time());
 
 
 /**************************************************/
@@ -42,6 +43,7 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 	feedback.push_back(*msg_);
 	// Add new accumulator to get the stats of the last elapsed period
 	acc.push_back(std::pair<AccType, AccType>());
+	stdAcc.push_back(std::pair<AccType, AccType>());
 
 	for (std::list< std::pair<AccType, AccType> >::iterator it = acc.begin(); it != acc.end(); it++)
 	{
@@ -56,29 +58,45 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 	double effortStdDev = sqrt(boost::accumulators::variance(acc.front().second));
 
 
-	ROS_DEBUG("pos: (%.5f, %.5f) -- eff: (%.5f, %.5f)", posMean, posStdDev, effortMean, effortStdDev);
+	for (std::list< std::pair<AccType, AccType> >::iterator it = stdAcc.begin(); it != stdAcc.end(); it++)
+	{
+		it->first(posStdDev);
+		it->second(effortStdDev);
+	}
+
+
+	ROS_DEBUG("pos: (%.3f, %.5f) -- eff: (%.3f, %.5f) -- acc: %zu", posMean, posStdDev, effortMean, effortStdDev, acc.size());
+
+	double posStd2 = sqrt(boost::accumulators::variance(stdAcc.front().first));
+	double effStd2 = sqrt(boost::accumulators::variance(stdAcc.front().second));
+	ROS_DEBUG("posStd2: %.4E -- effStd2: %.4E -- stdAcc: %zu", posStd2, effStd2, stdAcc.size());
 
 
 	ros::Duration elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
-	if (elapsed.toSec() > TIME_WINDOW &&
-			posStdDev < POS_STD_THRES &&
-			effortStdDev < EFFORT_STD_THRES)
+	if (msg_->feedback.effort < 0 &&
+			elapsed.toSec() > TIME_WINDOW &&
+			posStd2 < POS_STD_THRES &&
+			effStd2 < EFFORT_STD_THRES)
 	{
-		if (!steadyBegin.first)
+		ROS_INFO_ONCE("...steady zone reached");
+		if (!steady.first)
 		{
-			steadyBegin.second = feedback.back().header.stamp;
-			steadyBegin.first = true;
+			ROS_DEBUG("setting comparison time");
+			steady.second = feedback.back().header.stamp;
+			steady.first = true;
 		}
 		else
 		{
-			ros::Duration steadyTime = feedback.back().header.stamp - steadyBegin.second;
-			if (steadyTime.toSec() >= TIME_WINDOW_STEADY)
+			ros::Duration steadyElapsed = feedback.back().header.stamp - steady.second;
+			ROS_DEBUG("steady elapsed: %.4f", steadyElapsed.toSec());
+			if (steadyElapsed.toSec() >= TIME_WINDOW_STEADY)
 			{
+				ROS_INFO("...gripper stuck!");
 				std_msgs::Bool stuckMsg;
 				stuckMsg.data = true;
 				stuckPublisher_.publish(stuckMsg);
 
-				steadyBegin.first = false;
+				steady.first = false;
 			}
 		}
 	}
@@ -88,6 +106,7 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 	{
 		feedback.pop_front();
 		acc.pop_front();
+		stdAcc.pop_front();
 		elapsed = feedback.back().header.stamp - feedback.front().header.stamp;
 	}
 
@@ -96,11 +115,13 @@ void feedbackReceived(const control_msgs::GripperCommandActionFeedbackConstPtr &
 
 
 /**************************************************/
-void newGoal(const control_msgs::GripperCommandActionGoalConstPtr &msg_)
+void newGoal(const control_msgs::GripperCommandActionGoalConstPtr & msg_)
 {
 	mutex.lock();
 	feedback.clear();
 	acc.clear();
+	stdAcc.clear();
+	steady.first = false;
 	mutex.unlock();
 }
 
