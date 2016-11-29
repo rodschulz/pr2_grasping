@@ -285,7 +285,7 @@ void releaseObject(MoveGroupPtr &effector_,
 	std::vector<moveit_msgs::CollisionObject> collisions;
 	collisions.push_back(genCollisionObject(OBJECT_FAKE_AUX, FRAME_R_GRIPPER, geometry_msgs::Pose(), 0.25, 0.2, 0.25));
 	planningScene_->addCollisionObjects(collisions);
-	ros::Duration(1.0).sleep();
+	// ros::Duration(0.5).sleep();
 
 	effector_->attachObject(OBJECT_FAKE_AUX, "", allowedTouch);
 	ros::Duration(0.5).sleep();
@@ -313,21 +313,19 @@ void releaseObject(MoveGroupPtr &effector_,
 		scenePub.publish(cleanScene);
 		ros::Duration(0.5).sleep();
 
-		if (!RobotUtils::move(effector_, 5))
+		if (!RobotUtils::move(effector_, 10))
 			ROS_WARN("Unable to move gripper, releasing 'as is'");
 	}
-	else
-	{
-		ROS_INFO(".....detaching aux collision");
-		effector_->detachObject(OBJECT_FAKE_AUX);
-		ros::Duration(0.5).sleep();
 
-		ROS_INFO(".....removing aux collision");
-		std::vector<std::string> ids;
-		ids.push_back(OBJECT_FAKE_AUX);
-		planningScene_->removeCollisionObjects(ids);
-		ros::Duration(0.5).sleep();
-	}
+	ROS_INFO(".....detaching aux collision");
+	effector_->detachObject(OBJECT_FAKE_AUX);
+	ros::Duration(0.5).sleep();
+
+	ROS_INFO(".....removing aux collision");
+	std::vector<std::string> ids;
+	ids.push_back(OBJECT_FAKE_AUX);
+	planningScene_->removeCollisionObjects(ids);
+	ros::Duration(0.5).sleep();
 
 	ROS_INFO(".....opening gripper");
 	RobotUtils::moveGripper(effector_->getName(), 1);
@@ -482,7 +480,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 			ROS_INFO("...adding collisions to scene");
 			planningScene_->addCollisionObjects(collisions);
-			ros::Duration(2).sleep();
+			ros::Duration(1).sleep();
 
 			ROS_DEBUG("publishing grasping pose");
 			posePub.publish(grasp.grasp_pose);
@@ -575,7 +573,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 			ROS_INFO("...releasing object");
 			releaseObject(effector_, planningScene_, side_);
-			ros::Duration(0.5).sleep();
+			// ros::Duration(0.5).sleep();
 
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
