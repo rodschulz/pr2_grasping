@@ -52,11 +52,14 @@ def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 		if cls == -1:
 			continue
 
+		totalPts = len(points_)
+		minPts = 0.1 * totalPts
 		pts = points_[clusteringLabels_ == cls]
-		if len(pts) < 20 :
+		if len(pts) < minPts:
+			rp.loginfo('.......cluster discarded % 4d / %4d pts', len(pts), totalPts)
 			continue
 
-		rp.loginfo('.......cluster size: %d pts', len(pts))
+		rp.loginfo('.......cluster size: %4d pts', len(pts))
 
 		position = np.average(pts, axis=0)
 		# normal = np.average(normals_[clusteringLabels_ == cls], axis=0)
@@ -75,6 +78,11 @@ def synthesizePoints(frameId_, points_, normals_, clusteringLabels_, index_):
 
 		points.append(point)
 
+		if debug:
+			labels = np.ones(len(points_)) * -1
+			labels[clusteringLabels_ == cls] = 1
+			utils.plotSelectedCluster(utils.getOutputPath(), points_, labels, index_, cls, 'set1')
+
 	return points
 
 
@@ -91,7 +99,9 @@ def analyze(data_):
 	graspPts = []
 	minDataSize = 0.1 * npts
 	for key in points:
-		if (len(points[key]) < minDataSize) or (len(points[key]) < 10):
+		# filter classes with too few points
+		classSize = len(points[key])
+		if (classSize < minDataSize) or (classSize < 10):
 			continue
 
 		# Get the actual data from the cloud
@@ -110,7 +120,7 @@ def analyze(data_):
 
 			# Generate debug data if requested
 			if debug:
-				utils.plotData3D(utils.getOutputPath(), positionData, db.labels_, key, nclusters, palette)
+				utils.plotClusters(utils.getOutputPath(), positionData, db.labels_, key, nclusters, palette)
 
 
 	# Publish the synthesized grasping points
