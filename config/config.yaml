@@ -38,7 +38,7 @@ labeler:
     # sampling voxel size (value < 0 to don't downsample)
     voxelSize: -1
     # location of the codebook file
-    codebookLocation: config/bow50_c7_1E-4_opencv.dat
+    codebookLocation: config/codebook_200-24_c7_1E-04_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
@@ -47,10 +47,10 @@ labeler:
 
 ##### grasper node options #####
 analyzer:
-    # point's neighborhood size (query radius)
+    # max distance between two points to be considered as in the same neighborhood
     epsilon: 0.01
-    # min number of points in a point's neighborhood to be considered as a high density zone
-    minPoints: 20
+    # number of points in a neighborhood for a point to be considered core point
+    minPoints: 30
     # color palette used for the debug graph generation
     palette: Set3 # Options are: Spectral, Set1, Set2, Set3
 
@@ -60,7 +60,7 @@ grasper:
     # parameters regarding the use of a previously trained classifier for grasps
     classifier:
       use: false
-      location: config/svm_test.yaml
+      location: config/svm_SET2.yaml
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
