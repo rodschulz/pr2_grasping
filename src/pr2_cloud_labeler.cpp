@@ -65,7 +65,7 @@ LabelingState state = STATE_IDLE;
 pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
 std::string cloudFrameId;
 boost::mutex mutex;
-CvSVMPtr svm;
+SVMPtr svm;
 
 /***** Debug variables *****/
 ros::Publisher limitsPublisher, planePublisher;
