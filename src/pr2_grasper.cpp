@@ -52,6 +52,7 @@ std::deque<pr2_grasping::GraspingData> queue;
 
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
+bool mockExecution = true;
 
 bool armGoalAbort = false;
 GripperState gState = STATE_IDLE;
@@ -360,6 +361,7 @@ bool usePoint(const int label_, const float angle_)
 
 	if (svm)
 	{
+		ROS_DEBUG("...predicting with SVM");
 		float distance = svm->predict(sample, true);
 		float cls = svm->predict(sample, false);
 		use = abs(cls - 1) < 1E-8;
@@ -367,11 +369,20 @@ bool usePoint(const int label_, const float angle_)
 	}
 	else if (boosting)
 	{
-		// const cv::Mat& sample, const cv::Mat& missing = Mat(), const cv::Range & slice = Range::all(), bool rawMode = false, bool returnSum = false
+		ROS_DEBUG("...predicting with boosting tree");
+		float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
+		float cls = boosting->predict(sample);
+		use = abs(cls - 1) < 1E-8;
+		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
 	}
 	else if (network)
-	{}
-	else {}
+	{
+		ROS_DEBUG("...predicting with neural network");
+		cv::Mat output = cv::Mat(1, 2, CV_32FC1);
+		network->predict(sample, output);
+		use = output.at<float>(0.0) > 0;
+		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s", label_, angle_, output.at<float>(0.0), use ? "TRUE" : "FALSE");
+	}
 
 	return use;
 }
@@ -388,62 +399,17 @@ std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const Effector
 	std::vector<std::pair<moveit_msgs::Grasp, float> > grasps;
 	DEBUG_points_.clear();
 
-	if (svm)
+
+	size_t npoints = queue.front().graspingPoints.size();
+	for (size_t i = 0; i < npoints; i++)
 	{
-		ROS_INFO("...using classifier");
-
-		size_t npoints = queue.front().graspingPoints.size();
-		for (size_t i = 0; i < npoints; i++)
+		pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+		for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
 		{
-			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
-
-			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
-			{
-				int label = point.label;
-				float angle = j * ANGLE_STEP;
-
-				cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
-				sample.at<float>(0, 0) = label;
-				sample.at<float>(0, 1) = angle;
-				float distance = svm->predict(sample, true);
-				float cls = svm->predict(sample, false);
-				bool usePoint = abs(cls - 1) < 1E-8;
-
-				ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label, angle, distance, usePoint ? "TRUE" : "FALSE", cls);
-
-				if (usePoint)
-				{
-					geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
-					std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
-					moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
-
-					grasps.push_back(make_pair(grasp, angle));
-
-					/***** FOR DEBUG ONLY *****/
-					geometry_msgs::PoseStamped gp = graspingPose;
-					gp.pose.position = point.position;
-					DEBUG_points_.push_back(gp);
-				}
-			}
-
-			pointIdx++;
-		}
-
-		ROS_INFO("...predicted %zu grasps", grasps.size());
-	}
-	else
-	{
-		ROS_INFO("...sweeping point-angle space");
-
-		size_t npoints = queue.front().graspingPoints.size();
-		for (size_t i = 0; i < npoints; i++)
-		{
-			pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
-
-			for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+			float angle = j * ANGLE_STEP;
+			if (usePoint(point.label, angle))
 			{
 				// Synthesize the actual grasp
-				float angle = j * ANGLE_STEP;
 				geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
 				std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
 				moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
@@ -455,10 +421,9 @@ std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const Effector
 				gp.pose.position = point.position;
 				DEBUG_points_.push_back(gp);
 			}
-
-			pointIdx++;
 		}
-		ROS_INFO("...synthesized %zu grasps", grasps.size());
+
+		pointIdx++;
 	}
 
 	return grasps;
@@ -527,66 +492,73 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			gmutex.unlock();
 
 			// Perform the grasp
-			ROS_INFO("...attempting grasp");
-			int maxAttempts = 10;
-			moveit::planning_interface::MoveItErrorCode code;
-			for (int att = 0;
-					att < maxAttempts && code.val != moveit_msgs::MoveItErrorCodes::SUCCESS;
-					att++)
+			if (mockExecution)
 			{
-				ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
-				code = effector_->pick(OBJECT_TARGET, grasp);
-				ROS_INFO(".....finished: %d / %s (attempt %d of %d)", code.val, PkgUtils::toString(code).c_str(), att + 1, maxAttempts);
-
-				// Break if there was an abort, but wasn't the arm controller
-				if (code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && !armGoalAbort)
-					break;
-			}
-
-
-			/********** Evaluate result if the grasp was completed **********/
-			pr2_grasping::GraspEvaluator srv;
-			srv.response.result = false;
-
-			// Skip the rest if the planning failed
-			bool attemptCompleted = false;
-			if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
-					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
-					 gState == STATE_STUCK) ||
-					(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
-					 armGoalAbort))
-			{
-				attemptCompleted = true;
-
-				// Detach so the object can be 'seen'
-				// ROS_INFO("...detaching object for evaluation");
-				// effector_->detachObject(OBJECT_TARGET);
-				// ros::Duration(0.5).sleep();
-
-				// Call the evaluation node
-				ROS_INFO("...evaluating result");
-				while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
-				{
-					ROS_WARN("...clearing scene for evaluation");
-					moveit_msgs::PlanningSceneWorld cleanScene;
-					scenePub.publish(cleanScene);
-					// ros::Duration(0.5).sleep();
-				}
-
-				ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+				ROS_INFO("...mocking grasp routine");
+				ros::Duration(2).sleep();
 			}
 			else
-				ROS_INFO("...attempt failed, skipping evaluation");
+			{
+				ROS_INFO("...attempting grasp");
+				int maxAttempts = 10;
+				moveit::planning_interface::MoveItErrorCode code;
+				for (int att = 0;
+						att < maxAttempts && code.val != moveit_msgs::MoveItErrorCodes::SUCCESS;
+						att++)
+				{
+					ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
+					code = effector_->pick(OBJECT_TARGET, grasp);
+					ROS_INFO(".....finished: %d / %s (attempt %d of %d)", code.val, PkgUtils::toString(code).c_str(), att + 1, maxAttempts);
+
+					// Break if there was an abort, but wasn't the arm controller
+					if (code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED && !armGoalAbort)
+						break;
+				}
+
+
+				/********** Evaluate result if the grasp was completed **********/
+				pr2_grasping::GraspEvaluator srv;
+				srv.response.result = false;
+
+				// Skip the rest if the planning failed
+				bool attemptCompleted = false;
+				if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
+						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+						 gState == STATE_STUCK) ||
+						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
+						 armGoalAbort))
+				{
+					attemptCompleted = true;
+
+					// Detach so the object can be 'seen'
+					// ROS_INFO("...detaching object for evaluation");
+					// effector_->detachObject(OBJECT_TARGET);
+					// ros::Duration(0.5).sleep();
+
+					// Call the evaluation node
+					ROS_INFO("...evaluating result");
+					while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+					{
+						ROS_WARN("...clearing scene for evaluation");
+						moveit_msgs::PlanningSceneWorld cleanScene;
+						scenePub.publish(cleanScene);
+						// ros::Duration(0.5).sleep();
+					}
+
+					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+				}
+				else
+					ROS_INFO("...attempt failed, skipping evaluation");
+
+				/********** Store the result **********/
+				IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, grasps[i].second, ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
+			}
 
 
 			// restore tracked state
 			gmutex.lock();
 			gState = STATE_IDLE;
 			gmutex.unlock();
-
-
-			/********** Store the result **********/
-			IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, grasps[i].second, ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
 
 
 			/********** Restore back everything **********/
@@ -601,9 +573,12 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			planningScene_->removeCollisionObjects(ids);
 			ros::Duration(0.5).sleep();
 
-			ROS_INFO("...releasing object");
-			releaseObject(effector_, planningScene_, side_);
-			// ros::Duration(0.5).sleep();
+			if (!mockExecution)
+			{
+				ROS_INFO("...releasing object");
+				releaseObject(effector_, planningScene_, side_);
+				// ros::Duration(0.5).sleep();
+			}
 
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
@@ -630,7 +605,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 
 /**************************************************/
-bool queryName(pr2_grasping::GraspingGroup::Request  &request_,
+bool queryName(pr2_grasping::GraspingGroup::Request &request_,
 			   pr2_grasping::GraspingGroup::Response &response_,
 			   const MoveGroupPtr effector_)
 {
@@ -697,17 +672,17 @@ void loadClassifier()
 		svm = SVMPtr(new cv::SVM());
 		svm->load(location.c_str());
 	}
-	else if (file["my_nn"])
-	{
-		ROS_INFO("...loading neural network");
-		network = NeuralNetworkPtr(new cv::NeuralNet_MLP());
-		network->load(location.c_str());
-	}
 	else if (file["my_boost_tree"])
 	{
 		ROS_INFO("...loading boosting tree");
 		boosting = BoostingPtr(new cv::Boost());
 		boosting->load(location.c_str());
+	}
+	else if (file["my_nn"])
+	{
+		ROS_INFO("...loading neural network");
+		network = NeuralNetworkPtr(new cv::NeuralNet_MLP());
+		network->load(location.c_str());
 	}
 }
 
@@ -734,6 +709,7 @@ int main(int _argn, char **_argv)
 	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
+	mockExecution = Config::get()["grasper"]["mockExecution"].as<bool>();
 
 	// Load the classifier if requested
 	if (Config::get()["grasper"]["classifier"]["use"].as<bool>())
