@@ -44,6 +44,21 @@ enum GripperState
 	STATE_STUCK
 };
 
+/***** Structure holding the data relative to one grasp *****/
+struct GraspData
+{
+	moveit_msgs::Grasp grasp;
+	float angle;
+	int label;
+
+	GraspData(const moveit_msgs::Grasp grasp_, const float angle_, const int label_)
+	{
+		grasp = grasp_;
+		angle = angle_;
+		label = label_;
+	}
+};
+
 
 /***** Global variables *****/
 ros::Publisher posePub, cancelPub, scenePub, statusPub;
@@ -389,21 +404,23 @@ bool usePoint(const int label_, const float angle_)
 
 
 /**************************************************/
-std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const EffectorSide &side_,
-		const bool debugEnabled_,
-		std::vector<geometry_msgs::PoseStamped> &DEBUG_points_)
+std::vector<GraspData> generateGrasps(const EffectorSide &side_,
+									  const std::vector<pr2_grasping::GraspingPoint> points_,
+									  const bool debugEnabled_,
+									  std::vector<geometry_msgs::PoseStamped> &DEBUG_points_)
 {
 	// Number of grasping points processed
 	static int pointIdx = 0;
 
-	std::vector<std::pair<moveit_msgs::Grasp, float> > grasps;
+	std::vector<GraspData> grasps;
 	DEBUG_points_.clear();
 
+	ROS_DEBUG("grasp points size: %zu", points_.size());
 
-	size_t npoints = queue.front().graspingPoints.size();
+	size_t npoints = points_.size();
 	for (size_t i = 0; i < npoints; i++)
 	{
-		pr2_grasping::GraspingPoint point = queue.front().graspingPoints[i];
+		pr2_grasping::GraspingPoint point = points_[i];
 		for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
 		{
 			float angle = j * ANGLE_STEP;
@@ -411,10 +428,10 @@ std::vector<std::pair<moveit_msgs::Grasp, float> > generateGrasps(const Effector
 			{
 				// Synthesize the actual grasp
 				geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
-				std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j);
+				std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j) + "_" + boost::lexical_cast<std::string>(i);
 				moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
 
-				grasps.push_back(make_pair(grasp, angle));
+				grasps.push_back(GraspData(grasp, angle, point.label));
 
 				/***** FOR DEBUG ONLY *****/
 				geometry_msgs::PoseStamped gp = graspingPose;
@@ -454,7 +471,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		/********** STAGE 2: generate points to grasp ************/
 		/*********************************************************/
 		std::vector<geometry_msgs::PoseStamped> DEBUG_points; // for debug only
-		std::vector<std::pair<moveit_msgs::Grasp, float> > grasps = generateGrasps(side_, debugEnabled_, DEBUG_points);
+		std::vector<GraspData> grasps = generateGrasps(side_, queue.front().graspingPoints, debugEnabled_, DEBUG_points);
 
 
 		/*********************************************************/
@@ -464,8 +481,8 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		for (size_t i = 0; i < ngrasps; i++)
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
-			moveit_msgs::Grasp grasp = grasps[i].first;
-			ROS_DEBUG("grasp id: %s", grasp.id.c_str());
+			moveit_msgs::Grasp grasp = grasps[i].grasp;
+			ROS_DEBUG("grasp id: %s -- label: %d", grasp.id.c_str(), grasps[i].label);
 
 
 			ROS_INFO("...clearing scene");
@@ -495,7 +512,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			if (mockExecution)
 			{
 				ROS_INFO("...mocking grasp routine");
-				ros::Duration(2).sleep();
+				ros::Duration(1).sleep();
 			}
 			else
 			{
@@ -551,7 +568,15 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 					ROS_INFO("...attempt failed, skipping evaluation");
 
 				/********** Store the result **********/
-				IO::saveResults(trackedObject, attemptCompleted, srv.response.result, queue.front().graspingPoints[i].label, grasps[i].second, ANGLE_SPLIT_NUM, ANGLE_STEP, grasp, code);
+				IO::saveResults(trackedObject,
+								attemptCompleted,
+								srv.response.result,
+								grasps[i].label,
+								grasps[i].angle,
+								ANGLE_SPLIT_NUM,
+								ANGLE_STEP,
+								grasp,
+								code);
 			}
 
 
