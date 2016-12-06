@@ -38,7 +38,7 @@ labeler:
     # sampling voxel size (value < 0 to don't downsample)
     voxelSize: -1
     # location of the codebook file
-    codebookLocation: config/codebook_200-24_c7_1E-04_opencv.dat
+    codebookLocation: config/codebook_200-32_c7_1E-04_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the labeled and colored clouds have to be written to disk (writes it once)
@@ -60,13 +60,15 @@ grasper:
     # parameters regarding the use of a previously trained classifier for grasps
     classifier:
       use: false
-      location: config/svm_SET2.yaml
+      location: config/classifier_svm.yaml
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
     collisionMargin: 0.04
     # gap between object and effector at the begin of the grasping
     graspPadding: 0.15
+    # mocks the grasp routine without actually moving the robot
+    mockExecution: false
 
 
 ##### evaluator node options #####
