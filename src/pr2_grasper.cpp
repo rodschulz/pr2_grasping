@@ -568,15 +568,9 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 					ROS_INFO("...attempt failed, skipping evaluation");
 
 				/********** Store the result **********/
-				IO::saveResults(trackedObject,
-								attemptCompleted,
-								srv.response.result,
-								grasps[i].label,
-								grasps[i].angle,
-								ANGLE_SPLIT_NUM,
-								ANGLE_STEP,
-								grasp,
-								code);
+				IO::saveResults(trackedObject, attemptCompleted, srv.response.result,
+								grasps[i].label, grasps[i].angle, ANGLE_SPLIT_NUM,
+								ANGLE_STEP, grasp, code);
 			}
 
 
