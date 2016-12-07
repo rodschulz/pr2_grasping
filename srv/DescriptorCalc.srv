@@ -1,5 +1,7 @@
-# descriptor calculation target
+# Descriptor calculation target
 geometry_msgs/Point target
 ---
-# computed descriptor
+# Index of the point used for calculation
+std_msgs/Int32 index
+# Computed descriptor
 std_msgs/Float64[] descriptor

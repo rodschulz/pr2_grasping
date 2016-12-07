@@ -64,6 +64,10 @@ public:
 									   const float diry_ = 0,
 									   const float dirz_ = 0);
 
+	/**************************************************/
+	static int findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+								const pcl::PointNormal &target_);
+
 private:
 	// Constructor
 	GraspingUtils();

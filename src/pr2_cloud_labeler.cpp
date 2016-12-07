@@ -65,6 +65,7 @@ tf::TransformListener *tfListener;
 ros::Publisher cloudPub, dataPub;
 LabelingState state = STATE_IDLE;
 pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
+pcl::PointCloud<pcl::PointNormal>::Ptr writtenCloud;
 std::string cloudFrameId;
 boost::mutex mutex;
 SVMPtr svm;
@@ -320,6 +321,7 @@ void labelCloud(const float voxelSize_,
 		pr2_grasping::ExperimentId srv;
 		if (ros::service::call("/pr2_grasping/experiment_id", srv))
 		{
+			writtenCloud = cloud;
 			std::string filename = outputDir + srv.response.id + ".pcd";
 			ROS_DEBUG("Writing cloud to %s", filename.c_str());
 			pcl::io::savePCDFileASCII(filename, *cloud);
@@ -377,7 +379,31 @@ void labelCloud(const float voxelSize_,
 bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 					   pr2_grasping::DescriptorCalc::Response &response_)
 {
-	// request_.target;
+	if (writtenCloud)
+	{
+		// Extract the target point
+		pcl::PointNormal p;
+		p.x = request_.target.x;
+		p.y = request_.target.y;
+		p.z = request_.target.z;
+		int nearest = GraspingUtils::findNearestPoint(writtenCloud, p);
+
+		// Calculate the descriptor
+		Descriptor desc = Calculator::calculateDescriptor(writtenCloud, Config::getDescriptorParams(), nearest);
+
+		// Prepare the msg
+		size_t nbands = desc.size();
+		size_t bandSize = desc[0]->sequenceVector.size();
+		size_t descriptorSize = nbands * bandSize;
+		response_.descriptor.resize(descriptorSize);
+		response_.index.data = nearest;
+
+		// Copy data to the msg
+		for (size_t band = 0; band < nbands; band++)
+			for (size_t seq = 0; seq < bandSize; seq++)
+				response_.descriptor[band * bandSize + seq].data = desc[band]->sequenceVector[seq];
+	}
+
 	return true;
 }
 

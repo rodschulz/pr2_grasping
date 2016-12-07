@@ -6,6 +6,7 @@
 #include <pcl/filters/plane_clipper3D.h>
 #include <pcl/filters/impl/plane_clipper3D.hpp>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/search/kdtree.h>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
 
@@ -154,4 +155,17 @@ geometry_msgs::Pose GraspingUtils::genPose(const float x_,
 	pose.orientation.z = p.z() * sin(theta_ / 2);
 
 	return pose;
+}
+
+int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+									const pcl::PointNormal &target_)
+{
+	pcl::search::KdTree<pcl::PointNormal>::Ptr kdTree(new pcl::search::KdTree<pcl::PointNormal>);
+	kdTree->setInputCloud(cloud_);
+
+	std::vector<int> indices;
+	std::vector<float> sqrDistances;
+	kdTree->nearestKSearch(target_, 1, indices, sqrDistances);
+
+	return indices[0];
 }
