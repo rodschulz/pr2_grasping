@@ -62,7 +62,7 @@ enum LabelingState
 
 /***** Global variables *****/
 tf::TransformListener *tfListener;
-ros::Publisher cloudPublisher, dataPublisher;
+ros::Publisher cloudPub, dataPub;
 LabelingState state = STATE_IDLE;
 pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
 std::string cloudFrameId;
@@ -71,7 +71,7 @@ SVMPtr svm;
 std::string outputDir = PkgUtils::getOutputPath();
 
 /***** Debug variables *****/
-ros::Publisher limitsPublisher, planePublisher;
+ros::Publisher limitsPub, planePub;
 
 
 /**************************************************/
@@ -284,13 +284,13 @@ void labelCloud(const float voxelSize_,
 		arrayMsg.header.frame_id = limits.first.header.frame_id;
 		arrayMsg.poses.push_back(GraspingUtils::genPose(limits.first.point.x, limits.first.point.y, limits.first.point.z));
 		arrayMsg.poses.push_back(GraspingUtils::genPose(limits.second.point.x, limits.second.point.y, limits.second.point.z));
-		limitsPublisher.publish(arrayMsg);
+		limitsPub.publish(arrayMsg);
 
 		sensor_msgs::PointCloud2 planeMsg;
 		pcl::toROSMsg<pcl::PointXYZ>(*clippingPlane, planeMsg);
 		planeMsg.header.stamp = ros::Time::now();
 		planeMsg.header.frame_id = cloudFrameId;
-		planePublisher.publish(planeMsg);
+		planePub.publish(planeMsg);
 	}
 
 
@@ -340,8 +340,8 @@ void labelCloud(const float voxelSize_,
 	objectData.boundingBoxMax = limits.second;
 
 	ROS_DEBUG("Publishing data");
-	cloudPublisher.publish(objectCloud);
-	dataPublisher.publish(objectData);
+	cloudPub.publish(objectCloud);
+	dataPub.publish(objectData);
 
 
 	// Write debug data
@@ -409,8 +409,8 @@ int main(int argn_, char **argv_)
 
 
 	/********** Set subscriptions/publishers **********/
-	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1, true);
-	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 1);
+	cloudPub = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1, true);
+	dataPub = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 1);
 	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, cloudCallback);
 
 	if (debugEnabled)
@@ -418,8 +418,8 @@ int main(int argn_, char **argv_)
 		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug))
 			ros::console::notifyLoggerLevelsChanged();
 
-		limitsPublisher = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/debug_limits", 1);
-		planePublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_clipping_plane", 1);
+		limitsPub = handler.advertise<geometry_msgs::PoseArray>("/pr2_grasping/debug_limits", 1);
+		planePub = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/debug_clipping_plane", 1);
 	}
 
 
