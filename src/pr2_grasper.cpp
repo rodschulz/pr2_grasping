@@ -57,6 +57,13 @@ struct GraspData
 		angle = angle_;
 		label = label_;
 	}
+
+	GraspData(const GraspData &other_)
+	{
+		grasp = other_.grasp;
+		angle = other_.angle;
+		label = other_.label;
+	}
 };
 
 
@@ -404,10 +411,10 @@ bool usePoint(const int label_, const float angle_)
 
 
 /**************************************************/
-std::vector<GraspData> generateGrasps(const EffectorSide &side_,
-									  const std::vector<pr2_grasping::GraspingPoint> points_,
-									  const bool debugEnabled_,
-									  std::vector<geometry_msgs::PoseStamped> &DEBUG_points_)
+std::vector<GraspData> genGraspData(const EffectorSide &side_,
+									const std::vector<pr2_grasping::GraspingPoint> points_,
+									const bool debugEnabled_,
+									std::vector<geometry_msgs::PoseStamped> &DEBUG_points_)
 {
 	// Number of grasping points processed
 	static int pointIdx = 0;
@@ -471,7 +478,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		/********** STAGE 2: generate points to grasp ************/
 		/*********************************************************/
 		std::vector<geometry_msgs::PoseStamped> DEBUG_points; // for debug only
-		std::vector<GraspData> grasps = generateGrasps(side_, queue.front().graspingPoints, debugEnabled_, DEBUG_points);
+		std::vector<GraspData> grasps = genGraspData(side_, queue.front().graspingPoints, debugEnabled_, DEBUG_points);
 
 
 		/*********************************************************/
@@ -481,6 +488,8 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		for (size_t i = 0; i < ngrasps; i++)
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
+			ROS_INFO("...attempt id: %s", IO::nextExperimentId(trackedObject).c_str());
+
 			moveit_msgs::Grasp grasp = grasps[i].grasp;
 			ROS_DEBUG("grasp id: %s -- label: %d", grasp.id.c_str(), grasps[i].label);
 
@@ -547,11 +556,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 				{
 					attemptCompleted = true;
 
-					// Detach so the object can be 'seen'
-					// ROS_INFO("...detaching object for evaluation");
-					// effector_->detachObject(OBJECT_TARGET);
-					// ros::Duration(0.5).sleep();
-
 					// Call the evaluation node
 					ROS_INFO("...evaluating result");
 					while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
@@ -559,7 +563,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 						ROS_WARN("...clearing scene for evaluation");
 						moveit_msgs::PlanningSceneWorld cleanScene;
 						scenePub.publish(cleanScene);
-						// ros::Duration(0.5).sleep();
 					}
 
 					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
@@ -592,17 +595,21 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			planningScene_->removeCollisionObjects(ids);
 			ros::Duration(0.5).sleep();
 
+
 			if (!mockExecution)
 			{
 				ROS_INFO("...releasing object");
 				releaseObject(effector_, planningScene_, side_);
-				// ros::Duration(0.5).sleep();
 			}
+
 
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
 			if (ros::service::call("/pr2_grasping/gazebo_setup", setup))
+			{
+				IO::nextExperimentId(trackedObject);
 				ROS_INFO("...setup %s", setup.response.result ? "RESTORED" : "restore FAILED");
+			}
 		}
 
 
@@ -792,6 +799,7 @@ int main(int _argn, char **_argv)
 	}
 	trackedObject = srv.response.trackedObject;
 	supportObject = srv.response.supportObject;
+	IO::nextExperimentId(trackedObject);
 
 
 	/********** Start periodic check/ask for new grasping points **********/
