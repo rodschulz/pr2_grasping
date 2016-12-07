@@ -16,6 +16,12 @@ class IO
 {
 public:
 	/**************************************************/
+	static std::string nextExperimentId(const std::string &targetObject_);
+
+	/**************************************************/
+	static std::string getExperimentId();
+
+	/**************************************************/
 	static void saveResults(const std::string &targetObject_,
 							const bool attemptCompleted_,
 							const bool attemptSuccessful_,
@@ -25,7 +31,6 @@ public:
 							const float gripperAngleStep_,
 							const moveit_msgs::Grasp &grasp_,
 							const moveit::planning_interface::MoveItErrorCode &errCode_);
-
 private:
 	IO();
 	~IO();

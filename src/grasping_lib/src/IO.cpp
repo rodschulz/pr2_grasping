@@ -8,6 +8,21 @@
 #include <fstream>
 
 
+// Variable tracking the id of current experiment
+static std::string experimentId = "";
+
+
+std::string IO::getExperimentId()
+{
+	return experimentId;
+}
+
+std::string IO::nextExperimentId(const std::string &targetObject_)
+{
+	experimentId = targetObject_ + "_" + PkgUtils::getTimestamp("%Y-%m-%d_%H%M%S");
+	return experimentId;
+}
+
 void IO::saveResults(const std::string &targetObject_,
 					 const bool attemptCompleted_,
 					 const bool attemptSuccessful_,
@@ -18,9 +33,7 @@ void IO::saveResults(const std::string &targetObject_,
 					 const moveit_msgs::Grasp &grasp_,
 					 const moveit::planning_interface::MoveItErrorCode &errCode_)
 {
-	std::string filename = PkgUtils::getOutputPath() +
-						   targetObject_ + "_" +
-						   PkgUtils::getTimestamp("%Y-%m-%d_%H%M%S") + ".yaml";
+	std::string filename = PkgUtils::getOutputPath() + IO::getExperimentId() + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
 
