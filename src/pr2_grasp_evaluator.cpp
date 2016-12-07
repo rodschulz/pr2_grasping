@@ -9,6 +9,7 @@
 #include <pr2_grasping/EvaluationStatus.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
+#include <pr2_grasping/ExperimentId.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <pcl/point_types.h>
@@ -168,7 +169,11 @@ bool evaluateGrasping(pr2_grasping::GraspEvaluator::Request  &request_,
 
 
 	// Publish evaluation status
+	pr2_grasping::ExperimentId srv;
+	ros::service::call("/pr2_grasping/experiment_id", srv);
+
 	pr2_grasping::EvaluationStatus stMsg;
+	stMsg.id = srv.response.id;
 	stMsg.status = pr2_grasping::EvaluationStatus::BEFORE_EVAL;
 	statusPub.publish(stMsg);
 

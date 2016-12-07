@@ -1,4 +1,5 @@
 int32 status
+string id
 
 # statuses
 int32 BEFORE_EVAL=1
