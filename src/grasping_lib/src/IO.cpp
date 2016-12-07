@@ -28,14 +28,21 @@ void IO::saveResults(const std::string &targetObject_,
 					 const bool attemptSuccessful_,
 					 const int clusterLabel_,
 					 const float gripperAngle_,
+					 const moveit_msgs::Grasp &grasp_,
 					 const int gripperAngleSplitNum_,
 					 const float gripperAngleStep_,
-					 const moveit_msgs::Grasp &grasp_,
-					 const moveit::planning_interface::MoveItErrorCode &errCode_)
+					 const moveit::planning_interface::MoveItErrorCode &errCode_,
+					 const int pointIndex_,
+					 const std::vector<std_msgs::Float64> &descriptor_)
 {
 	std::string filename = PkgUtils::getOutputPath() + IO::getExperimentId() + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
+
+	std::vector<double> desc;
+	desc.resize(descriptor_.size());
+	for (size_t i = 0; i < descriptor_.size(); i++)
+		desc[i] = descriptor_[i].data;
 
 	// generate a YAML file with the results
 	YAML::Emitter emitter;
@@ -48,6 +55,12 @@ void IO::saveResults(const std::string &targetObject_,
 			<< YAML::Key << "attempt_completed" << YAML::Value << attemptCompleted_
 			<< YAML::Key << "success" << YAML::Value << attemptSuccessful_
 			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
+			<< YAML::EndMap
+
+			<< YAML::Key << "descriptor"
+			<< YAML::BeginMap
+			<< YAML::Key << "point_index" << YAML::Value << pointIndex_
+			<< YAML::Key << "data" << YAML::Value << desc
 			<< YAML::EndMap
 
 			<< YAML::Key << "orientation"

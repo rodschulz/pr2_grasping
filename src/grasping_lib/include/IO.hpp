@@ -7,6 +7,7 @@
 #include <string>
 #include <ros/time.h>
 #include <ros/duration.h>
+#include <std_msgs/Float64.h>
 #include <moveit_msgs/Grasp.h>
 #include <yaml-cpp/yaml.h>
 #include <moveit/move_group_interface/move_group.h>
@@ -27,10 +28,12 @@ public:
 							const bool attemptSuccessful_,
 							const int clusterLabel_,
 							const float gripperAngle_,
+							const moveit_msgs::Grasp &grasp_,
 							const int gripperAngleSplitNum_,
 							const float gripperAngleStep_,
-							const moveit_msgs::Grasp &grasp_,
-							const moveit::planning_interface::MoveItErrorCode &errCode_);
+							const moveit::planning_interface::MoveItErrorCode &errCode_,
+							const int pointIndex_,
+							const std::vector<std_msgs::Float64> &descriptor_);
 private:
 	IO();
 	~IO();

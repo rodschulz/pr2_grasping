@@ -8,6 +8,7 @@
 #include <pr2_grasping/GraspingData.h>
 #include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/CloudLabeler.h>
+#include <pr2_grasping/DescriptorCalc.h>
 #include <pr2_grasping/GazeboSetup.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
@@ -493,10 +494,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
 			ROS_INFO("...attempt id: %s", IO::nextExperimentId(trackedObject).c_str());
-
-
-			moveit_msgs::Grasp grasp = grasps[i].grasp;
-			ROS_DEBUG("grasp id: %s -- label: %d", grasp.id.c_str(), grasps[i].label);
+			ROS_DEBUG("grasp id: %s -- label: %d", grasps[i].grasp.id.c_str(), grasps[i].label);
 
 
 			ROS_INFO("...clearing scene");
@@ -509,7 +507,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			ros::Duration(1).sleep();
 
 			ROS_DEBUG("publishing grasping pose");
-			posePub.publish(grasp.grasp_pose);
+			posePub.publish(grasps[i].grasp.grasp_pose);
 			if (debugEnabled_)
 			{
 				ROS_DEBUG("publishing grasping point");
@@ -538,7 +536,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 						att++)
 				{
 					ROS_INFO(".....attempt %d of %d", att + 1, maxAttempts);
-					code = effector_->pick(OBJECT_TARGET, grasp);
+					code = effector_->pick(OBJECT_TARGET, grasps[i].grasp);
 					ROS_INFO(".....finished: %d / %s (attempt %d of %d)", code.val, PkgUtils::toString(code).c_str(), att + 1, maxAttempts);
 
 					// Break if there was an abort, but wasn't the arm controller
@@ -548,37 +546,50 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 
 				/********** Evaluate result if the grasp was completed **********/
-				pr2_grasping::GraspEvaluator srv;
-				srv.response.result = false;
+				pr2_grasping::GraspEvaluator eval;
+				eval.response.result = false;
 
 				// Skip the rest if the planning failed
-				bool attemptCompleted = false;
+				bool completed = false;
 				if (code.val == moveit_msgs::MoveItErrorCodes::SUCCESS ||
 						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
 						 gState == STATE_STUCK) ||
 						(code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED &&
 						 armGoalAbort))
 				{
-					attemptCompleted = true;
+					completed = true;
 
 					// Call the evaluation node
 					ROS_INFO("...evaluating result");
-					while (!ros::service::call("/pr2_grasping/grasp_evaluator", srv))
+					while (!ros::service::call("/pr2_grasping/grasp_evaluator", eval))
 					{
 						ROS_WARN("...clearing scene for evaluation");
 						moveit_msgs::PlanningSceneWorld cleanScene;
 						scenePub.publish(cleanScene);
 					}
 
-					ROS_INFO("...grasp attempt %s", srv.response.result ? "SUCCESSFUL" : "FAILED");
+					ROS_INFO("...grasp attempt %s", eval.response.result ? "SUCCESSFUL" : "FAILED");
 				}
 				else
 					ROS_INFO("...attempt failed, skipping evaluation");
 
+
+				pr2_grasping::DescriptorCalc desc;
+				ros::service::call("/pr2_grasping/descriptor_calculator", desc);
+
+
 				/********** Store the result **********/
-				IO::saveResults(trackedObject, attemptCompleted, srv.response.result,
-								grasps[i].label, grasps[i].angle, ANGLE_SPLIT_NUM,
-								ANGLE_STEP, grasp, code);
+				IO::saveResults(trackedObject,
+								completed,
+								eval.response.result,
+								grasps[i].label,
+								grasps[i].angle,
+								grasps[i].grasp,
+								ANGLE_SPLIT_NUM,
+								ANGLE_STEP,
+								code,
+								desc.response.index.data,
+								desc.response.descriptor);
 			}
 
 
