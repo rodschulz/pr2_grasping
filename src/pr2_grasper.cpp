@@ -34,8 +34,6 @@
 
 
 #define OBJECT_FAKE_AUX		"object_fake_aux"
-#define ANGLE_SPLIT_NUM		4
-#define ANGLE_STEP			M_PI / ANGLE_SPLIT_NUM
 
 
 /***** Enumeration defining the possible states for the gripper *****/
@@ -76,6 +74,7 @@ std::deque<pr2_grasping::GraspingData> queue;
 
 float collisionMargin = 0.01;
 float graspPadding = 0.1;
+float nsplits = 10;
 bool mockExecution = true;
 
 bool armGoalAbort = false;
@@ -429,13 +428,14 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 
 	ROS_DEBUG("grasp points size: %zu", points_.size());
 
+	float angleStep = M_PI / nsplits;
 	size_t npoints = points_.size();
 	for (size_t i = 0; i < npoints; i++)
 	{
 		pr2_grasping::GraspingPoint point = points_[i];
-		for (int j = 0; j < ANGLE_SPLIT_NUM; j++)
+		for (int j = 0; j < nsplits; j++)
 		{
-			float angle = j * ANGLE_STEP;
+			float angle = j * angleStep;
 			if (usePoint(point.label, angle))
 			{
 				// Synthesize the actual grasp
@@ -585,8 +585,8 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 								grasps[i].label,
 								grasps[i].angle,
 								grasps[i].grasp,
-								ANGLE_SPLIT_NUM,
-								ANGLE_STEP,
+								nsplits,
+								(M_PI / nsplits),
 								code,
 								desc.response.index.data,
 								desc.response.descriptor);
@@ -755,6 +755,7 @@ int main(int _argn, char **_argv)
 	bool debugEnabled = Config::get()["grasperDebug"].as<bool>();
 	collisionMargin = Config::get()["grasper"]["collisionMargin"].as<float>();
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
+	nsplits = Config::get()["grasper"]["angleSplits"].as<int>();
 	mockExecution = Config::get()["grasper"]["mockExecution"].as<bool>();
 
 	// Load the classifier if requested

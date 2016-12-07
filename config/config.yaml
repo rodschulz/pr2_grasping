@@ -67,6 +67,8 @@ grasper:
     collisionMargin: 0.04
     # gap between object and effector at the begin of the grasping
     graspPadding: 0.15
+    # number of angles to be tested (between 0 and PI)
+    angleSplits: 4
     # mocks the grasp routine without actually moving the robot
     mockExecution: false
 
