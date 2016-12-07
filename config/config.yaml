@@ -41,7 +41,7 @@ labeler:
     codebookLocation: config/codebook_200-32_c7_1E-04_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
-    # indicates if the labeled and colored clouds have to be written to disk (writes it once)
+    # indicates if the object's cloud has to be stored
     writeClouds: true
 
 

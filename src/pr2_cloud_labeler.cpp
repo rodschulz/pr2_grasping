@@ -10,6 +10,7 @@
 #include <pr2_grasping/ObjectCloudData.h>
 #include <pr2_grasping/CloudLabeler.h>
 #include <pr2_grasping/DescriptorCalc.h>
+#include <pr2_grasping/ExperimentId.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/impl/transforms.hpp>
@@ -25,7 +26,6 @@
 #include "GraspingUtils.hpp"
 #include "PkgUtils.hpp"
 #include "RobotUtils.hpp"
-#include "IO.hpp"
 #include "Writer.hpp"
 
 
@@ -68,7 +68,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
 std::string cloudFrameId;
 boost::mutex mutex;
 SVMPtr svm;
-std::string outputDir = PkgUtils::getOutputPath();
+std::string outputDir;
 
 /***** Debug variables *****/
 ros::Publisher limitsPub, planePub;
@@ -245,6 +245,7 @@ void labelCloud(const float voxelSize_,
 		return;
 	}
 
+
 	// Downsample if requested
 	pcl::PointCloud<pcl::PointXYZ>::Ptr sampled = pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>());
 	if (voxelSize_ > 0)
@@ -256,6 +257,7 @@ void labelCloud(const float voxelSize_,
 	ROS_DEBUG("Clipping cloud");
 	pcl::PointCloud<pcl::PointXYZ>::Ptr clippingPlane = debugEnabled_ ? pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()) : pcl::PointCloud<pcl::PointXYZ>::Ptr();
 	pcl::PointCloud<pcl::PointXYZ>::Ptr filtered = GraspingUtils::planeClipping(sampled, transformation, AXIS_Z, clippingPlaneZ_, 1, clippingPlane);
+
 
 	ROS_DEBUG("Cloud clipped");
 	if (filtered->empty())
@@ -275,6 +277,7 @@ void labelCloud(const float voxelSize_,
 	pcl::PointCloud<pcl::PointXYZ>::Ptr transformed(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl_ros::transformPointCloud(*filtered, *transformed, transformation);
 	std::pair<geometry_msgs::PointStamped, geometry_msgs::PointStamped> limits = getBoundingBoxLimits<pcl::PointXYZ>(transformed, FRAME_BASE);
+
 
 	if (debugEnabled_)
 	{
@@ -313,7 +316,15 @@ void labelCloud(const float voxelSize_,
 
 	// Write the object's cloud
 	if (writeClouds_)
-		pcl::io::savePCDFileASCII(outputDir + IO::getExperimentId() + ".pcd", *cloud);
+	{
+		pr2_grasping::ExperimentId srv;
+		if (ros::service::call("/pr2_grasping/experiment_id", srv))
+		{
+			std::string filename = outputDir + srv.response.id + ".pcd";
+			ROS_DEBUG("Writing cloud to %s", filename.c_str());
+			pcl::io::savePCDFileASCII(filename, *cloud);
+		}
+	}
 
 
 	// Descriptor dense evaluation over the point cloud
@@ -346,7 +357,7 @@ void labelCloud(const float voxelSize_,
 
 	// Write debug data
 	static bool cloudsWritten = false;
-	if (debugEnabled_ && writeClouds_ && !cloudsWritten)
+	if (debugEnabled_ && !cloudsWritten)
 	{
 		Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
@@ -377,6 +388,7 @@ int main(int argn_, char **argv_)
 	ros::init(argn_, argv_, "pr2_cloud_labeler");
 	ros::NodeHandle handler;
 	tfListener = new tf::TransformListener(ros::Duration(10.0));
+	outputDir = PkgUtils::getOutputPath();
 
 
 	/********** Start spinning **********/

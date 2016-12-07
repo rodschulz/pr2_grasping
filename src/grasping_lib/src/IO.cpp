@@ -9,7 +9,7 @@
 
 
 // Variable tracking the id of current experiment
-static std::string experimentId = "unknown";
+std::string experimentId = "unknown";
 
 
 std::string IO::getExperimentId()

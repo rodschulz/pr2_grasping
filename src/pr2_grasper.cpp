@@ -11,6 +11,7 @@
 #include <pr2_grasping/GazeboSetup.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
+#include <pr2_grasping/ExperimentId.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Int32.h>
 #include <actionlib_msgs/GoalID.h>
@@ -288,74 +289,77 @@ void releaseObject(MoveGroupPtr &effector_,
 				   moveit::planning_interface::PlanningSceneInterface *planningScene_,
 				   const EffectorSide &side_)
 {
-	if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
-		ros::console::notifyLoggerLevelsChanged();
-
-	// Stop any previous movement
-	effector_->stop();
-
-	ROS_INFO(".....setting aux collision");
-	std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
-	std::vector<std::string> allowedTouch;
-	allowedTouch.push_back(prefix + "_forearm_roll_link");
-	allowedTouch.push_back(prefix + "_forearm_link");
-	allowedTouch.push_back(prefix + "_wrist_flex_link");
-	allowedTouch.push_back(prefix + "_wrist_roll_link");
-	allowedTouch.push_back(prefix + "_gripper_palm_link");
-	allowedTouch.push_back(prefix + "_gripper_r_finger_link");
-	allowedTouch.push_back(prefix + "_gripper_r_finger_tip_link");
-	allowedTouch.push_back(prefix + "_gripper_l_finger_link");
-	allowedTouch.push_back(prefix + "_gripper_l_finger_tip_link");
-
-	std::vector<moveit_msgs::CollisionObject> collisions;
-	collisions.push_back(genCollisionObject(OBJECT_FAKE_AUX, FRAME_R_GRIPPER, geometry_msgs::Pose(), 0.25, 0.2, 0.25));
-	planningScene_->addCollisionObjects(collisions);
-	// ros::Duration(0.5).sleep();
-
-	effector_->attachObject(OBJECT_FAKE_AUX, "", allowedTouch);
-	ros::Duration(0.5).sleep();
-
-
-	// Move the effector to an adequate pose to release the object
-	ROS_INFO(".....moving effector to release pose");
-	Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, -1));
-	geometry_msgs::PoseStamped current;
-	current.header.frame_id = FRAME_BASE;
-	current.pose.position.x = 0.35;
-	current.pose.position.y = -0.5;
-	current.pose.position.z = 0.9;
-	current.pose.orientation.w = rotation.w();
-	current.pose.orientation.x = rotation.x();
-	current.pose.orientation.y = rotation.y();
-	current.pose.orientation.z = rotation.z();
-	effector_->setPoseTarget(current);
-
-	if (!RobotUtils::move(effector_, 10))
+	if (!mockExecution)
 	{
-		ROS_WARN("Unable to move gripper for release. Clearing scene and retrying");
+		if (ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME ".actionlib", ros::console::levels::Info))
+			ros::console::notifyLoggerLevelsChanged();
 
-		moveit_msgs::PlanningSceneWorld cleanScene;
-		scenePub.publish(cleanScene);
+		// Stop any previous movement
+		effector_->stop();
+
+		ROS_INFO(".....setting aux collision");
+		std::string prefix = (side_ == LEFT_ARM ? "l" : "r");
+		std::vector<std::string> allowedTouch;
+		allowedTouch.push_back(prefix + "_forearm_roll_link");
+		allowedTouch.push_back(prefix + "_forearm_link");
+		allowedTouch.push_back(prefix + "_wrist_flex_link");
+		allowedTouch.push_back(prefix + "_wrist_roll_link");
+		allowedTouch.push_back(prefix + "_gripper_palm_link");
+		allowedTouch.push_back(prefix + "_gripper_r_finger_link");
+		allowedTouch.push_back(prefix + "_gripper_r_finger_tip_link");
+		allowedTouch.push_back(prefix + "_gripper_l_finger_link");
+		allowedTouch.push_back(prefix + "_gripper_l_finger_tip_link");
+
+		std::vector<moveit_msgs::CollisionObject> collisions;
+		collisions.push_back(genCollisionObject(OBJECT_FAKE_AUX, FRAME_R_GRIPPER, geometry_msgs::Pose(), 0.25, 0.2, 0.25));
+		planningScene_->addCollisionObjects(collisions);
+		// ros::Duration(0.5).sleep();
+
+		effector_->attachObject(OBJECT_FAKE_AUX, "", allowedTouch);
 		ros::Duration(0.5).sleep();
 
+
+		// Move the effector to an adequate pose to release the object
+		ROS_INFO(".....moving effector to release pose");
+		Eigen::Quaternionf rotation = Eigen::Quaternionf::FromTwoVectors(Eigen::Vector3f(1, 0, 0), Eigen::Vector3f(0, 0, -1));
+		geometry_msgs::PoseStamped current;
+		current.header.frame_id = FRAME_BASE;
+		current.pose.position.x = 0.35;
+		current.pose.position.y = -0.5;
+		current.pose.position.z = 0.9;
+		current.pose.orientation.w = rotation.w();
+		current.pose.orientation.x = rotation.x();
+		current.pose.orientation.y = rotation.y();
+		current.pose.orientation.z = rotation.z();
+		effector_->setPoseTarget(current);
+
 		if (!RobotUtils::move(effector_, 10))
-			ROS_WARN("Unable to move gripper, releasing 'as is'");
+		{
+			ROS_WARN("Unable to move gripper for release. Clearing scene and retrying");
+
+			moveit_msgs::PlanningSceneWorld cleanScene;
+			scenePub.publish(cleanScene);
+			ros::Duration(0.5).sleep();
+
+			if (!RobotUtils::move(effector_, 10))
+				ROS_WARN("Unable to move gripper, releasing 'as is'");
+		}
+
+		ROS_INFO(".....detaching aux collision");
+		effector_->detachObject(OBJECT_FAKE_AUX);
+		ros::Duration(0.5).sleep();
+
+		ROS_INFO(".....removing aux collision");
+		std::vector<std::string> ids;
+		ids.push_back(OBJECT_FAKE_AUX);
+		planningScene_->removeCollisionObjects(ids);
+		ros::Duration(0.5).sleep();
+
+		ROS_INFO(".....opening gripper");
+		RobotUtils::moveGripper(effector_->getName(), 1);
+
+		ROS_INFO(".....release action completed");
 	}
-
-	ROS_INFO(".....detaching aux collision");
-	effector_->detachObject(OBJECT_FAKE_AUX);
-	ros::Duration(0.5).sleep();
-
-	ROS_INFO(".....removing aux collision");
-	std::vector<std::string> ids;
-	ids.push_back(OBJECT_FAKE_AUX);
-	planningScene_->removeCollisionObjects(ids);
-	ros::Duration(0.5).sleep();
-
-	ROS_INFO(".....opening gripper");
-	RobotUtils::moveGripper(effector_->getName(), 1);
-
-	ROS_INFO(".....release action completed");
 }
 
 
@@ -490,6 +494,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
 			ROS_INFO("...attempt id: %s", IO::nextExperimentId(trackedObject).c_str());
 
+
 			moveit_msgs::Grasp grasp = grasps[i].grasp;
 			ROS_DEBUG("grasp id: %s -- label: %d", grasp.id.c_str(), grasps[i].label);
 
@@ -595,13 +600,8 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 			planningScene_->removeCollisionObjects(ids);
 			ros::Duration(0.5).sleep();
 
-
-			if (!mockExecution)
-			{
-				ROS_INFO("...releasing object");
-				releaseObject(effector_, planningScene_, side_);
-			}
-
+			ROS_INFO("...releasing object");
+			releaseObject(effector_, planningScene_, side_);
 
 			ROS_INFO("...restoring setup");
 			pr2_grasping::GazeboSetup setup;
@@ -645,6 +645,15 @@ bool queryName(pr2_grasping::GraspingGroup::Request &request_,
 		response_.groupName = "";
 		response_.result = false;
 	}
+	return true;
+}
+
+
+/**************************************************/
+bool queryId(pr2_grasping::ExperimentId::Request &request_,
+			 pr2_grasping::ExperimentId::Response &response_)
+{
+	response_.id = IO::getExperimentId();
 	return true;
 }
 
@@ -755,6 +764,9 @@ int main(int _argn, char **_argv)
 	/********** Set services **********/
 	ROS_INFO("Starting name query service");
 	ros::ServiceServer nameService = handler.advertiseService<pr2_grasping::GraspingGroup::Request, pr2_grasping::GraspingGroup::Response>("/pr2_grasping/effector_name", boost::bind(queryName, _1, _2, effector));
+	ROS_INFO("Starting id query service");
+	ros::ServiceServer idService = handler.advertiseService("/pr2_grasping/experiment_id", queryId);
+
 
 	/********** Set subscriptions/publishers **********/
 	ROS_INFO("Setting publishers/subscribers");
