@@ -9,6 +9,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <pr2_grasping/ObjectCloudData.h>
 #include <pr2_grasping/CloudLabeler.h>
+#include <pr2_grasping/DescriptorCalc.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/transforms.h>
 #include <pcl_ros/impl/transforms.hpp>
@@ -205,7 +206,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
 
 
 /**************************************************/
-bool scheduleLabeling(pr2_grasping::CloudLabeler::Request  &request_,
+bool scheduleLabeling(pr2_grasping::CloudLabeler::Request &request_,
 					  pr2_grasping::CloudLabeler::Response &response_)
 {
 	if (state == STATE_IDLE)
@@ -360,6 +361,15 @@ void labelCloud(const float voxelSize_,
 
 
 /**************************************************/
+bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
+					   pr2_grasping::DescriptorCalc::Response &response_)
+{
+	// request_.target;
+	return true;
+}
+
+
+/**************************************************/
 int main(int argn_, char **argv_)
 {
 	ros::init(argn_, argv_, "pr2_cloud_labeler");
@@ -414,6 +424,8 @@ int main(int argn_, char **argv_)
 	/********** Set services **********/
 	ROS_INFO("Starting labeler service");
 	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
+	ROS_INFO("Starting calculation service");
+	ros::ServiceServer calculationService = handler.advertiseService("/pr2_grasping/descriptor_calculator", computeDescriptor);
 
 
 	// Spin at 20 Hz

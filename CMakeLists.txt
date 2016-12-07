@@ -73,6 +73,7 @@ add_message_files(
 add_service_files(
 	FILES
 		CloudLabeler.srv
+		DescriptorCalc.srv
 		GazeboSetup.srv
 		GraspEvaluator.srv
 		GraspingGroup.srv

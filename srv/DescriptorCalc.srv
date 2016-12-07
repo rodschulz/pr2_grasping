@@ -1,0 +1,5 @@
+# descriptor calculation target
+geometry_msgs/Point target
+---
+# computed descriptor
+std_msgs/Float64[] descriptor
