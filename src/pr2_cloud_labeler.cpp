@@ -25,6 +25,7 @@
 #include "GraspingUtils.hpp"
 #include "PkgUtils.hpp"
 #include "RobotUtils.hpp"
+#include "IO.hpp"
 #include "Writer.hpp"
 
 
@@ -67,6 +68,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr receivedCloud;
 std::string cloudFrameId;
 boost::mutex mutex;
 SVMPtr svm;
+std::string outputDir = PkgUtils::getOutputPath();
 
 /***** Debug variables *****/
 ros::Publisher limitsPublisher, planePublisher;
@@ -151,11 +153,7 @@ pcl::PointCloud<PointXYZNL>::Ptr generateLabeledCloud(const pcl::PointCloud<pcl:
 
 
 /**************************************************/
-void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_,
-				   const float voxelSize_,
-				   const float clippingPlaneZ_,
-				   const bool debugEnabled_,
-				   const bool writeClouds_)
+void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg_)
 {
 	static int labelingTries = 0;
 	int labelingMaxAttempts = 5;
@@ -313,6 +311,11 @@ void labelCloud(const float voxelSize_,
 	cloud->sensor_origin_ = transformed->sensor_origin_;
 
 
+	// Write the object's cloud
+	if (writeClouds_)
+		pcl::io::savePCDFileASCII(outputDir + IO::getExperimentId() + ".pcd", *cloud);
+
+
 	// Descriptor dense evaluation over the point cloud
 	ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
 	cv::Mat descriptors;
@@ -345,7 +348,6 @@ void labelCloud(const float voxelSize_,
 	static bool cloudsWritten = false;
 	if (debugEnabled_ && writeClouds_ && !cloudsWritten)
 	{
-		std::string outputDir = PkgUtils::getOutputPath();
 		Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
 		cloudsWritten =  true;
@@ -409,7 +411,7 @@ int main(int argn_, char **argv_)
 	/********** Set subscriptions/publishers **********/
 	cloudPublisher = handler.advertise<sensor_msgs::PointCloud2>("/pr2_grasping/labeled_cloud", 1, true);
 	dataPublisher = handler.advertise<pr2_grasping::ObjectCloudData>("/pr2_grasping/object_cloud_data", 1);
-	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, boost::bind(cloudCallback, _1, voxelSize, clippingPlaneZ, debugEnabled, writeClouds));
+	ros::Subscriber sub = handler.subscribe<sensor_msgs::PointCloud2>(topicName, 1, cloudCallback);
 
 	if (debugEnabled)
 	{
