@@ -156,12 +156,6 @@ add_executable(gripper_monitor src/gripper_monitor.cpp)
 add_executable(pr2_cloud_labeler src/pr2_cloud_labeler.cpp)
 add_executable(pr2_grasp_evaluator src/pr2_grasp_evaluator.cpp)
 add_executable(pr2_grasper src/pr2_grasper.cpp)
-### Example nodes ###
-add_executable(example_gp src/example_gp.cpp)
-add_executable(example_ac src/example_ac.cpp)
-### Test nodes ###
-add_executable(test_gp src/test_gp.cpp)
-add_executable(test_ac src/test_ac.cpp)
 
 # Set the linking dependencies for the complex applications
 set(APPS_LINKING_DEPENDENCIES
@@ -183,9 +177,3 @@ target_link_libraries(gripper_monitor ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_cloud_labeler ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasp_evaluator ${APPS_LINKING_DEPENDENCIES})
 target_link_libraries(pr2_grasper ${APPS_LINKING_DEPENDENCIES})
-### Example nodes ###
-target_link_libraries(example_gp ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(example_ac ${APPS_LINKING_DEPENDENCIES})
-### Test nodes ###
-target_link_libraries(test_gp ${APPS_LINKING_DEPENDENCIES})
-target_link_libraries(test_ac ${APPS_LINKING_DEPENDENCIES})
