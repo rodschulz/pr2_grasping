@@ -389,14 +389,23 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 		int nearest = GraspingUtils::findNearestPoint(writtenCloud, p);
 
 		// Calculate the descriptor
-		Descriptor desc = Calculator::calculateDescriptor(writtenCloud, Config::getDescriptorParams(), nearest);
+		DescriptorParams params = Config::getDescriptorParams();
+		Descriptor desc = Calculator::calculateDescriptor(writtenCloud, params, nearest);
 
 		// Prepare the msg
 		size_t nbands = desc.size();
 		size_t bandSize = desc[0]->sequenceVector.size();
 		size_t descriptorSize = nbands * bandSize;
+
 		response_.descriptor.resize(descriptorSize);
 		response_.index.data = nearest;
+		response_.params.patchSize = params.patchSize;
+		response_.params.bandNumber = params.bandNumber;
+		response_.params.bandWidth = params.bandWidth;
+		response_.params.bidirectional = params.bidirectional;
+		response_.params.useProjection = params.useProjection;
+		response_.params.sequenceBin = params.sequenceBin;
+		response_.params.sequenceStat = params.sequenceStat;
 
 		// Copy data to the msg
 		for (size_t band = 0; band < nbands; band++)

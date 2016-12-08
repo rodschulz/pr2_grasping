@@ -32,17 +32,16 @@ void IO::saveResults(const std::string &targetObject_,
 					 const int gripperAngleSplitNum_,
 					 const float gripperAngleStep_,
 					 const moveit::planning_interface::MoveItErrorCode &errCode_,
-					 const int pointIndex_,
-					 const std::vector<std_msgs::Float64> &descriptor_)
+					 const pr2_grasping::DescriptorCalc::Response &descriptor_)
 {
 	std::string filename = PkgUtils::getOutputPath() + IO::getExperimentId() + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
 
 	std::vector<double> desc;
-	desc.resize(descriptor_.size());
-	for (size_t i = 0; i < descriptor_.size(); i++)
-		desc[i] = descriptor_[i].data;
+	desc.resize(descriptor_.descriptor.size());
+	for (size_t i = 0; i < descriptor_.descriptor.size(); i++)
+		desc[i] = descriptor_.descriptor[i].data;
 
 	// generate a YAML file with the results
 	YAML::Emitter emitter;
@@ -57,11 +56,7 @@ void IO::saveResults(const std::string &targetObject_,
 			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
 			<< YAML::EndMap
 
-			<< YAML::Key << "descriptor"
-			<< YAML::BeginMap
-			<< YAML::Key << "point_index" << YAML::Value << pointIndex_
-			<< YAML::Key << "data" << YAML::Value << desc
-			<< YAML::EndMap
+			<< YAML::Key << "descriptor" << YAML::Value << descriptor_
 
 			<< YAML::Key << "orientation"
 			<< YAML::BeginMap

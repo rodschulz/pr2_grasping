@@ -7,8 +7,8 @@
 #include <string>
 #include <ros/time.h>
 #include <ros/duration.h>
-#include <std_msgs/Float64.h>
 #include <moveit_msgs/Grasp.h>
+#include <pr2_grasping/DescriptorCalc.h>
 #include <yaml-cpp/yaml.h>
 #include <moveit/move_group_interface/move_group.h>
 
@@ -32,8 +32,7 @@ public:
 							const int gripperAngleSplitNum_,
 							const float gripperAngleStep_,
 							const moveit::planning_interface::MoveItErrorCode &errCode_,
-							const int pointIndex_,
-							const std::vector<std_msgs::Float64> &descriptor_);
+							const pr2_grasping::DescriptorCalc::Response &descriptor_);
 private:
 	IO();
 	~IO();
@@ -190,6 +189,34 @@ YAML::Emitter& operator << (YAML::Emitter& out, const moveit_msgs::Grasp &msg_)
 		<< YAML::Key << "post_place_retreat" << YAML::Value << msg_.post_place_retreat
 		<< YAML::Key << "max_contact_force" << YAML::Value << msg_.max_contact_force
 		<< YAML::Key << "allowed_touch_objects" << YAML::Value << msg_.allowed_touch_objects
+		<< YAML::EndMap;
+	return out;
+}
+
+
+/**************************************************/
+YAML::Emitter& operator << (YAML::Emitter& out, const pr2_grasping::DescriptorCalc::Response &msg_)
+{
+	std::vector<double> desc;
+	desc.resize(msg_.descriptor.size());
+	for (size_t i = 0; i < msg_.descriptor.size(); i++)
+		desc[i] = msg_.descriptor[i].data;
+
+	std::string stat = msg_.params.sequenceStat == pr2_grasping::DescriptorParams::STAT_MEAN ? "mean" : "median";
+
+	out << YAML::BeginMap
+		<< YAML::Key << "point_index" << YAML::Value << msg_.index.data
+		<< YAML::Key << "data" << YAML::Value << desc
+		<< YAML::Key << "params"
+		<< YAML::BeginMap
+		<< YAML::Key << "patchSize" << YAML::Value << msg_.params.patchSize
+		<< YAML::Key << "bandNumber" << YAML::Value << msg_.params.bandNumber
+		<< YAML::Key << "bandWidth" << YAML::Value << msg_.params.bandWidth
+		<< YAML::Key << "bidirectional" << YAML::Value << (msg_.params.bidirectional == true)
+		<< YAML::Key << "useProjection" << YAML::Value << (msg_.params.useProjection == true)
+		<< YAML::Key << "sequenceBin" << YAML::Value << msg_.params.sequenceBin
+		<< YAML::Key << "sequenceStat" << YAML::Value << stat
+		<< YAML::EndMap
 		<< YAML::EndMap;
 	return out;
 }

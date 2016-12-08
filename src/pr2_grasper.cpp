@@ -588,8 +588,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 								nsplits,
 								(M_PI / nsplits),
 								code,
-								desc.response.index.data,
-								desc.response.descriptor);
+								desc.response);
 			}
 
 

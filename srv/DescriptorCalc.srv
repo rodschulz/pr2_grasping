@@ -3,5 +3,9 @@ geometry_msgs/Point target
 ---
 # Index of the point used for calculation
 std_msgs/Int32 index
+
 # Computed descriptor
 std_msgs/Float64[] descriptor
+
+# Params used to compute the descriptor 
+pr2_grasping/DescriptorParams params
