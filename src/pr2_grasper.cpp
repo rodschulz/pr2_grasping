@@ -575,6 +575,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 
 
 				pr2_grasping::DescriptorCalc desc;
+				desc.request.target = grasps[i].grasp.grasp_pose.pose;
 				ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 

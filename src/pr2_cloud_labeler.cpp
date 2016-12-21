@@ -21,7 +21,7 @@
 #include "Config.hpp"
 #include "Loader.hpp"
 #include "CloudUtils.hpp"
-#include "Calculator.hpp"
+#include "DCH.hpp"
 #include "ClusteringUtils.hpp"
 #include "GraspingUtils.hpp"
 #include "PkgUtils.hpp"
@@ -332,7 +332,7 @@ void labelCloud(const float voxelSize_,
 	// Descriptor dense evaluation over the point cloud
 	ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
 	cv::Mat descriptors;
-	Calculator::calculateDescriptors(cloud, Config::getDescriptorParams(), descriptors);
+	DCH::computeDense(cloud, Config::getDescriptorParams(), descriptors);
 
 	cv::Mat labels;
 	ROS_INFO("...labeling cloud");
@@ -382,35 +382,43 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 	if (writtenCloud)
 	{
 		// Extract the target point
-		pcl::PointNormal p;
-		p.x = request_.target.x;
-		p.y = request_.target.y;
-		p.z = request_.target.z;
-		int nearest = GraspingUtils::findNearestPoint(writtenCloud, p);
+		int nearest = GraspingUtils::findNearestPoint(writtenCloud, request_.target);
 
 		// Calculate the descriptor
-		DescriptorParams params = Config::getDescriptorParams();
-		Descriptor desc = Calculator::calculateDescriptor(writtenCloud, params, nearest);
+		DescriptorParamsPtr params = Config::getDescriptorParams();
+		response_.params.type = params->type;
 
-		// Prepare the msg
-		size_t nbands = desc.size();
-		size_t bandSize = desc[0]->sequenceVector.size();
-		size_t descriptorSize = nbands * bandSize;
+		if (params->type == DESCRIPTOR_DCH)
+		{
+			std::vector<BandPtr> desc = DCH::calculateDescriptor(writtenCloud, params, nearest);
 
-		response_.descriptor.resize(descriptorSize);
-		response_.index.data = nearest;
-		response_.params.patchSize = params.patchSize;
-		response_.params.bandNumber = params.bandNumber;
-		response_.params.bandWidth = params.bandWidth;
-		response_.params.bidirectional = params.bidirectional;
-		response_.params.useProjection = params.useProjection;
-		response_.params.sequenceBin = params.sequenceBin;
-		response_.params.sequenceStat = params.sequenceStat;
 
-		// Copy data to the msg
-		for (size_t band = 0; band < nbands; band++)
-			for (size_t seq = 0; seq < bandSize; seq++)
-				response_.descriptor[band * bandSize + seq].data = desc[band]->sequenceVector[seq];
+			size_t nbands = desc.size();
+			size_t bandSize = desc[0]->sequenceVector.size();
+			size_t descriptorSize = nbands * bandSize;
+
+
+			DCHParams *pars = dynamic_cast<DCHParams *>(params.get());
+			if (pars != NULL)
+			{
+				response_.descriptor.resize(descriptorSize);
+				response_.index.data = nearest;
+				response_.params.searchRadius = pars->searchRadius;
+				response_.params.bandNumber = pars->bandNumber;
+				response_.params.bandWidth = pars->bandWidth;
+				response_.params.bidirectional = pars->bidirectional;
+				response_.params.useProjection = pars->useProjection;
+				response_.params.sequenceBin = pars->sequenceBin;
+				response_.params.sequenceStat = pars->sequenceStat;
+			}
+
+			// Copy data to the msg
+			for (size_t band = 0; band < nbands; band++)
+				for (size_t seq = 0; seq < bandSize; seq++)
+					response_.descriptor[band * bandSize + seq].data = desc[band]->sequenceVector[seq];
+		}
+		else
+			ROS_WARN("Using unimplemented descriptor type (%s)", descType[params->type].c_str());
 	}
 
 	return true;

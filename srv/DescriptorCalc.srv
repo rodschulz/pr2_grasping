@@ -1,5 +1,5 @@
 # Descriptor calculation target
-geometry_msgs/Point target
+geometry_msgs/Pose target
 ---
 # Index of the point used for calculation
 std_msgs/Int32 index

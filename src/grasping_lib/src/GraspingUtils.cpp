@@ -158,14 +158,42 @@ geometry_msgs::Pose GraspingUtils::genPose(const float x_,
 }
 
 int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
-									const pcl::PointNormal &target_)
+									const geometry_msgs::Pose &target_)
 {
-	pcl::search::KdTree<pcl::PointNormal>::Ptr kdTree(new pcl::search::KdTree<pcl::PointNormal>);
-	kdTree->setInputCloud(cloud_);
+	// Add the grasping point to the cloud
+	float x = target_.position.x;
+	float y = target_.position.y;
+	float z = target_.position.z;
 
-	std::vector<int> indices;
-	std::vector<float> sqrDistances;
-	kdTree->nearestKSearch(target_, 1, indices, sqrDistances);
+	float dx = target_.orientation.x;
+	float dy = target_.orientation.y;
+	float dz = target_.orientation.z;
+	float dw = target_.orientation.w;
 
-	return indices[0];
+	Eigen::Vector3f origin = Eigen::Vector3f(x, y, z);
+	Eigen::Vector3f direction = Eigen::Quaternionf(dw, dx, dy, dz) * Eigen::Vector3f(1, 0, 0);
+	Eigen::ParametrizedLine<float, 3> line(origin, direction);
+
+
+	pcl::KdTreeFLANN<pcl::PointNormal> kdtree;
+	kdtree.setInputCloud(cloud_);
+
+	int target = -1;
+	float distance = std::numeric_limits<float>::max();
+	float step = 0.001;
+	for (float t = step; t < 0.2; t += step)
+	{
+		Eigen::Vector3f p = line.pointAt(t);
+		std::vector<int> indices;
+		std::vector<float> distances;
+		kdtree.nearestKSearch(PointFactory::createPointNormal(p.x(), p.y(), p.z(), 0, 0, 0), 1, indices, distances);
+
+		if (target == -1 || distances[0] < distance)
+		{
+			target = indices[0];
+			distance = distances[0];
+		}
+	}
+
+	return target;
 }

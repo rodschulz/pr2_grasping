@@ -66,7 +66,7 @@ public:
 
 	/**************************************************/
 	static int findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
-								const pcl::PointNormal &target_);
+								const geometry_msgs::Pose &target_);
 
 private:
 	// Constructor

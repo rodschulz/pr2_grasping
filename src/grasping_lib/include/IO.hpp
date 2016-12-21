@@ -202,21 +202,40 @@ YAML::Emitter& operator << (YAML::Emitter& out, const pr2_grasping::DescriptorCa
 	for (size_t i = 0; i < msg_.descriptor.size(); i++)
 		desc[i] = msg_.descriptor[i].data;
 
-	std::string stat = msg_.params.sequenceStat == pr2_grasping::DescriptorParams::STAT_MEAN ? "mean" : "median";
 
 	out << YAML::BeginMap
 		<< YAML::Key << "point_index" << YAML::Value << msg_.index.data
 		<< YAML::Key << "data" << YAML::Value << desc
 		<< YAML::Key << "params"
-		<< YAML::BeginMap
-		<< YAML::Key << "patchSize" << YAML::Value << msg_.params.patchSize
-		<< YAML::Key << "bandNumber" << YAML::Value << msg_.params.bandNumber
-		<< YAML::Key << "bandWidth" << YAML::Value << msg_.params.bandWidth
-		<< YAML::Key << "bidirectional" << YAML::Value << (msg_.params.bidirectional == true)
-		<< YAML::Key << "useProjection" << YAML::Value << (msg_.params.useProjection == true)
-		<< YAML::Key << "sequenceBin" << YAML::Value << msg_.params.sequenceBin
-		<< YAML::Key << "sequenceStat" << YAML::Value << stat
-		<< YAML::EndMap
+		<< YAML::BeginMap;
+
+	switch (msg_.params.type)
+	{
+	default:
+	case pr2_grasping::DescriptorParams::TYPE_DCH:
+	{
+		std::string stat = msg_.params.sequenceStat == pr2_grasping::DescriptorParams::STAT_MEAN ? "mean" : "median";
+
+		out << YAML::Key << "type" << YAML::Value << "DCH"
+			<< YAML::Key << "searchRadius" << YAML::Value << msg_.params.searchRadius
+			<< YAML::Key << "bandNumber" << YAML::Value << msg_.params.bandNumber
+			<< YAML::Key << "bandWidth" << YAML::Value << msg_.params.bandWidth
+			<< YAML::Key << "bidirectional" << YAML::Value << (msg_.params.bidirectional == true)
+			<< YAML::Key << "useProjection" << YAML::Value << (msg_.params.useProjection == true)
+			<< YAML::Key << "sequenceBin" << YAML::Value << msg_.params.sequenceBin
+			<< YAML::Key << "sequenceStat" << YAML::Value << stat;
+	}
+	break;
+
+	case pr2_grasping::DescriptorParams::TYPE_SHOT:
+	{
+		out << YAML::Key << "type" << YAML::Value << "SHOT"
+			<< YAML::Key << "searchRadius" << YAML::Value << msg_.params.searchRadius;
+	}
+	break;
+	}
+
+	out << YAML::EndMap
 		<< YAML::EndMap;
 	return out;
 }
