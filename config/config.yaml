@@ -95,13 +95,17 @@ normalEstimationRadius: -1
 
 ##### descriptor calculation params #####
 descriptor:
-    patchSize: 0.02 # mts
-    bandNumber: 8
-    bandWidth: 0.005 # mts
-    bidirectional: false
-    useProjection: false
-    sequenceBin: 0.005 # mts
-    sequenceStat: mean # mean or median
+    type: DCH # DCH, SHOT
+    DCH:
+      searchRadius: 0.02 # mts
+      bandNumber: 8
+      bandWidth: 0.005 # mts
+      bidirectional: false
+      useProjection: false
+      sequenceBin: 0.005 # mts
+      sequenceStat: mean # mean or median
+    SHOT:
+      searchRadius: 0.02 # mts
 
 ##### cloud smoothing params #####
 cloudSmoothing:
