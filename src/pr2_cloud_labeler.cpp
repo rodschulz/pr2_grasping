@@ -363,6 +363,7 @@ void labelCloud(const float voxelSize_,
 	{
 		Writer::writeClusteredCloud(outputDir + "DEBUG_cluster_colored.pcd", cloud, labels);
 		pcl::io::savePCDFileASCII(outputDir + "DEBUG_labeled.pcd", *labeledCloud);
+		pcl::io::savePCDFileASCII(outputDir + "DEBUG_full.pcd", *sampled);
 		cloudsWritten =  true;
 	}
 
@@ -388,13 +389,19 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 		DescriptorParamsPtr params = Config::getDescriptorParams();
 		response_.params.type = params->type;
 
-		if (params->type == DESCRIPTOR_DCH)
+		if (params->type == Params::DESCRIPTOR_DCH)
 		{
+			// ROS_WARN("BEFORE CALCULATION");
+			// Config::getInstance()->debug = true;
+
 			std::vector<BandPtr> desc = DCH::calculateDescriptor(writtenCloud, params, nearest);
+
+			// ROS_WARN("AFTER CALCULATION");
+			// Config::getInstance()->debug = true;
 
 
 			size_t nbands = desc.size();
-			size_t bandSize = desc[0]->sequenceVector.size();
+			size_t bandSize = desc[0]->descriptor.size();
 			size_t descriptorSize = nbands * bandSize;
 
 
@@ -408,17 +415,17 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 				response_.params.bandWidth = pars->bandWidth;
 				response_.params.bidirectional = pars->bidirectional;
 				response_.params.useProjection = pars->useProjection;
-				response_.params.sequenceBin = pars->sequenceBin;
-				response_.params.sequenceStat = pars->sequenceStat;
+				response_.params.binNumber = pars->binNumber;
+				response_.params.stat = pars->stat;
 			}
 
 			// Copy data to the msg
 			for (size_t band = 0; band < nbands; band++)
 				for (size_t seq = 0; seq < bandSize; seq++)
-					response_.descriptor[band * bandSize + seq].data = desc[band]->sequenceVector[seq];
+					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
 		}
 		else
-			ROS_WARN("Using unimplemented descriptor type (%s)", descType[params->type].c_str());
+			ROS_WARN("Using unimplemented descriptor type (%s)", Params::descType[params->type].c_str());
 	}
 
 	return true;

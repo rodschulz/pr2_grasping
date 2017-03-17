@@ -11,6 +11,7 @@
 #include <pr2_grasping/DescriptorCalc.h>
 #include <yaml-cpp/yaml.h>
 #include <moveit/move_group_interface/move_group.h>
+#include <DescriptorParams.hpp>
 
 
 class IO
@@ -214,7 +215,8 @@ YAML::Emitter& operator << (YAML::Emitter& out, const pr2_grasping::DescriptorCa
 	default:
 	case pr2_grasping::DescriptorParams::TYPE_DCH:
 	{
-		std::string stat = msg_.params.sequenceStat == pr2_grasping::DescriptorParams::STAT_MEAN ? "mean" : "median";
+		// std::string stat = msg_.params.stat == pr2_grasping::DescriptorParams::STAT_MEAN ? "mean" : "median";
+		std::string stat = Params::stat[msg_.params.stat];
 
 		out << YAML::Key << "type" << YAML::Value << "DCH"
 			<< YAML::Key << "searchRadius" << YAML::Value << msg_.params.searchRadius
@@ -222,8 +224,8 @@ YAML::Emitter& operator << (YAML::Emitter& out, const pr2_grasping::DescriptorCa
 			<< YAML::Key << "bandWidth" << YAML::Value << msg_.params.bandWidth
 			<< YAML::Key << "bidirectional" << YAML::Value << (msg_.params.bidirectional == true)
 			<< YAML::Key << "useProjection" << YAML::Value << (msg_.params.useProjection == true)
-			<< YAML::Key << "sequenceBin" << YAML::Value << msg_.params.sequenceBin
-			<< YAML::Key << "sequenceStat" << YAML::Value << stat;
+			<< YAML::Key << "binNumber" << YAML::Value << msg_.params.binNumber
+			<< YAML::Key << "stat" << YAML::Value << stat;
 	}
 	break;
 

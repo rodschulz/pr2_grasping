@@ -16,22 +16,31 @@ bool bidirectional
 # True if angles were computed projecting the vectors over the band's plane
 bool useProjection
 
-# Size of the bins used in the sequence construction
-float64 sequenceBin
+# Number of bins per band
+int32 binNumber
 
-# Statistic to use in the sequence calculation
-int32 sequenceStat
+# Statistic used the computation of DCH
+int32 stat
 
 
 
 # Sequence stats
 int32 STAT_MEAN = 0
 int32 STAT_MEDIAN = 1
+int32 STAT_HISTOGRAM_10 = 2
+int32 STAT_HISTOGRAM_20 = 3
+int32 STAT_HISTOGRAM_30 = 4
+#int32 STAT_HISTOGRAM_BIN_10 = 5	# not implemented yet
+#int32 STAT_HISTOGRAM_BIN_20 = 6	# not implemented yet
+#int32 STAT_HISTOGRAM_BIN_30 = 7	# not implemented yet
+
 
 # Descriptor type
 int32 TYPE_UNKNOWN = 0
 int32 TYPE_DCH = 1
 int32 TYPE_SHOT = 2
-#int32 TYPE_USC = 3		# not implemented yet
-#int32 TYPE_PFH = 4		# not implemented yet
-#int32 TYPE_ROPS = 5	# not implemented yet
+#int32 TYPE_USC = 3			# do not work
+#int32 TYPE_PFH = 4			# do not work
+int32 TYPE_FPFH = 5
+#int32 TYPE_ROPS = 6		# do not work
+int32 TYPE_SPIN_IMAGE = 7
