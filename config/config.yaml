@@ -59,7 +59,7 @@ analyzer:
 grasper:
     # parameters regarding the use of a previously trained classifier for grasps
     classifier:
-      use: false
+      use: true
       location: config/classifier_svm.yaml
     # arm used for grasping tasks
     arm: right # right or left
@@ -95,17 +95,31 @@ normalEstimationRadius: -1
 
 ##### descriptor calculation params #####
 descriptor:
-    type: DCH # DCH, SHOT
+    type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
     DCH:
-      searchRadius: 0.02 # mts
+      searchRadius: 0.03 # mts
       bandNumber: 8
       bandWidth: 0.005 # mts
       bidirectional: false
       useProjection: false
-      sequenceBin: 0.005 # mts
-      sequenceStat: mean # mean or median
+      binNumber: 3 # 3 bins of 0.01 mts
+      stat: 'hist20' # mean, median, hist10, hist20, hb20, hb10
     SHOT:
-      searchRadius: 0.02 # mts
+      searchRadius: 0.035 # mts
+    USC:
+      searchRadius: 0.035 # mts
+    PFH:
+      searchRadius: 0.035 # mts
+    FPFH:
+      searchRadius: 0.035 # mts
+    ROPS:
+      searchRadius: 0.035 # mts
+      partitionsNumber: 5
+      rotationsNumber: 3
+      supportRadius: 0.025
+    SpinImage:
+      searchRadius: 0.035 # mts
+      imageWidth: 8
 
 ##### cloud smoothing params #####
 cloudSmoothing:
