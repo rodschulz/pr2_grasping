@@ -38,11 +38,38 @@ labeler:
     # sampling voxel size (value < 0 to don't downsample)
     voxelSize: -1
     # location of the codebook file
-    codebookLocation: config/codebook_200-32_c7_1E-04_opencv.dat
+    codebookLocation: config/codebooks/codebook_200-32_c7_1E-04_opencv.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the object's cloud has to be stored
     writeClouds: true
+    ##### descriptor calculation params #####
+    descriptor:
+        type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
+        DCH:
+          searchRadius: 0.03 # mts
+          bandNumber: 8
+          bandWidth: 0.005 # mts
+          bidirectional: false
+          useProjection: false
+          binNumber: 4
+          stat: 'mean' # mean, median, hist10, hist20, hb20, hb10
+        SHOT:
+          searchRadius: 0.035 # mts
+        USC:
+          searchRadius: 0.035 # mts
+        PFH:
+          searchRadius: 0.035 # mts
+        FPFH:
+          searchRadius: 0.035 # mts
+        ROPS:
+          searchRadius: 0.035 # mts
+          partitionsNumber: 5
+          rotationsNumber: 3
+          supportRadius: 0.025
+        SpinImage:
+          searchRadius: 0.035 # mts
+          imageWidth: 8
 
 
 ##### grasper node options #####
@@ -59,8 +86,9 @@ analyzer:
 grasper:
     # parameters regarding the use of a previously trained classifier for grasps
     classifier:
-      use: true
-      location: config/classifier_svm.yaml
+        use: true
+        npoints: 3 # number of grasping points to be generated
+        location: config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
@@ -71,6 +99,33 @@ grasper:
     angleSplits: 4
     # mocks the grasp routine without actually moving the robot
     mockExecution: false
+    ##### descriptor calculation params #####
+    descriptor:
+        type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
+        DCH:
+          searchRadius: 0.03 # mts
+          bandNumber: 8
+          bandWidth: 0.005 # mts
+          bidirectional: false
+          useProjection: false
+          binNumber: 3 # 3 bins of 0.01 mts
+          stat: 'hist10' # mean, median, hist10, hist20, hb20, hb10
+        SHOT:
+          searchRadius: 0.035 # mts
+        USC:
+          searchRadius: 0.035 # mts
+        PFH:
+          searchRadius: 0.035 # mts
+        FPFH:
+          searchRadius: 0.035 # mts
+        ROPS:
+          searchRadius: 0.035 # mts
+          partitionsNumber: 5
+          rotationsNumber: 3
+          supportRadius: 0.025
+        SpinImage:
+          searchRadius: 0.035 # mts
+          imageWidth: 8
 
 
 ##### evaluator node options #####
@@ -88,38 +143,13 @@ evaluator:
     pointcloudTopic: /move_group/filtered_cloud 
 
 
-########## descriptor params ##########
+###################################################
+########## descriptor computation params ##########
+###################################################
+
 
 # radius used for the normal vectors estimation (-1 to use the 10 closest points)
 normalEstimationRadius: -1
-
-##### descriptor calculation params #####
-descriptor:
-    type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
-    DCH:
-      searchRadius: 0.03 # mts
-      bandNumber: 8
-      bandWidth: 0.005 # mts
-      bidirectional: false
-      useProjection: false
-      binNumber: 3 # 3 bins of 0.01 mts
-      stat: 'hist20' # mean, median, hist10, hist20, hb20, hb10
-    SHOT:
-      searchRadius: 0.035 # mts
-    USC:
-      searchRadius: 0.035 # mts
-    PFH:
-      searchRadius: 0.035 # mts
-    FPFH:
-      searchRadius: 0.035 # mts
-    ROPS:
-      searchRadius: 0.035 # mts
-      partitionsNumber: 5
-      rotationsNumber: 3
-      supportRadius: 0.025
-    SpinImage:
-      searchRadius: 0.035 # mts
-      imageWidth: 8
 
 ##### cloud smoothing params #####
 cloudSmoothing:
