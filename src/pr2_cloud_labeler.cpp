@@ -332,7 +332,7 @@ void labelCloud(const float voxelSize_,
 	// Descriptor dense evaluation over the point cloud
 	ROS_INFO("...performing dense evaluation (%zu points)", cloud->size());
 	cv::Mat descriptors;
-	DCH::computeDense(cloud, Config::getDescriptorParams(), descriptors);
+	DCH::computeDense(cloud, Config::getLabelingDescriptorParams(), descriptors);
 
 	cv::Mat labels;
 	ROS_INFO("...labeling cloud");
@@ -386,19 +386,12 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 		int nearest = GraspingUtils::findNearestPoint(writtenCloud, request_.target);
 
 		// Calculate the descriptor
-		DescriptorParamsPtr params = Config::getDescriptorParams();
+		DescriptorParamsPtr params = Config::getGraspingDescriptorParams();
 		response_.params.type = params->type;
 
 		if (params->type == Params::DESCRIPTOR_DCH)
 		{
-			// ROS_WARN("BEFORE CALCULATION");
-			// Config::getInstance()->debug = true;
-
 			std::vector<BandPtr> desc = DCH::calculateDescriptor(writtenCloud, params, nearest);
-
-			// ROS_WARN("AFTER CALCULATION");
-			// Config::getInstance()->debug = true;
-
 
 			size_t nbands = desc.size();
 			size_t bandSize = desc[0]->descriptor.size();
