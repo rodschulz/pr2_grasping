@@ -85,7 +85,6 @@ std::string supportObject = "";
 
 SVMPtr svm = SVMPtr();
 BoostingPtr boosting = BoostingPtr();
-NeuralNetworkPtr network = NeuralNetworkPtr();
 
 
 /***** Debug variables *****/
@@ -401,14 +400,6 @@ bool usePoint(const int label_, const float angle_)
 		use = abs(cls - 1) < 1E-8;
 		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
 	}
-	else if (network)
-	{
-		ROS_DEBUG("...predicting with neural network");
-		cv::Mat output = cv::Mat(1, 2, CV_32FC1);
-		network->predict(sample, output);
-		use = output.at<float>(0.0) > 0;
-		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s", label_, angle_, output.at<float>(0.0), use ? "TRUE" : "FALSE");
-	}
 
 	return use;
 }
@@ -723,12 +714,6 @@ void loadClassifier()
 		ROS_INFO("...loading boosting tree");
 		boosting = BoostingPtr(new cv::Boost());
 		boosting->load(location.c_str());
-	}
-	else if (file["my_nn"])
-	{
-		ROS_INFO("...loading neural network");
-		network = NeuralNetworkPtr(new cv::NeuralNet_MLP());
-		network->load(location.c_str());
 	}
 }
 
