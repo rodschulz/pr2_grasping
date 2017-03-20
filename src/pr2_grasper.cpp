@@ -48,12 +48,17 @@ enum GripperState
 struct GraspData
 {
 	moveit_msgs::Grasp grasp;
+	pr2_grasping::DescriptorCalc::Response descriptor;
 	float angle;
 	int label;
 
-	GraspData(const moveit_msgs::Grasp grasp_, const float angle_, const int label_)
+	GraspData(const moveit_msgs::Grasp &grasp_,
+			  const pr2_grasping::DescriptorCalc::Response &descriptor_,
+			  const float angle_,
+			  const int label_)
 	{
 		grasp = grasp_;
+		descriptor = descriptor_;
 		angle = angle_;
 		label = label_;
 	}
@@ -61,11 +66,35 @@ struct GraspData
 	GraspData(const GraspData &other_)
 	{
 		grasp = other_.grasp;
+		descriptor = other_.descriptor;
 		angle = other_.angle;
 		label = other_.label;
 	}
 };
 
+/***** Auxiliary structure to easy the grasping candidate generation process *****/
+struct CandidateData
+{
+	geometry_msgs::PoseStamped pose;
+	pr2_grasping::DescriptorCalc::Response descriptor;
+	pr2_grasping::GraspingPoint point;
+	float angle;
+	size_t indexPoint;
+	size_t indexAngle;
+
+	CandidateData()
+	{}
+
+	CandidateData(const CandidateData &other_)
+	{
+		pose = other_.pose;
+		descriptor = other_.descriptor;
+		point = other_.point;
+		angle = other_.angle;
+		indexPoint = other_.indexPoint;
+		indexAngle = other_.indexAngle;
+	}
+};
 
 /***** Global variables *****/
 ros::Publisher posePub, cancelPub, scenePub, statusPub;
@@ -83,6 +112,8 @@ GripperState gState = STATE_IDLE;
 std::string trackedObject = "";
 std::string supportObject = "";
 
+bool usePredictions = false;
+int npredictions = 0;
 SVMPtr svm = SVMPtr();
 BoostingPtr boosting = BoostingPtr();
 
@@ -376,32 +407,58 @@ void timerCallback(const ros::TimerEvent &event_)
 
 
 /**************************************************/
-bool usePoint(const int label_, const float angle_)
+// bool usePoint(const int label_, const float angle_)
+// {
+// 	bool use = true;
+
+// 	cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
+// 	sample.at<float>(0, 0) = label_;
+// 	sample.at<float>(0, 1) = angle_;
+
+// 	if (svm)
+// 	{
+// 		ROS_DEBUG("...predicting with SVM");
+// 		float distance = svm->predict(sample, true);
+// 		float cls = svm->predict(sample, false);
+// 		use = abs(cls - 1) < 1E-8;
+// 		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, distance, use ? "TRUE" : "FALSE", cls);
+// 	}
+// 	else if (boosting)
+// 	{
+// 		ROS_DEBUG("...predicting with boosting tree");
+// 		float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
+// 		float cls = boosting->predict(sample);
+// 		use = abs(cls - 1) < 1E-8;
+// 		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
+// 	}
+
+// 	return use;
+// }
+
+
+/**************************************************/
+float getPredictionScore(const pr2_grasping::DescriptorCalc::Response &descriptor_)
 {
-	bool use = true;
+	// cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
 
-	cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
-	sample.at<float>(0, 0) = label_;
-	sample.at<float>(0, 1) = angle_;
+	// if (svm)
+	// {
+	// 	ROS_DEBUG("...predicting with SVM");
+	// 	float distance = svm->predict(sample, true);
+	// 	float cls = svm->predict(sample, false);
+	// 	// use = abs(cls - 1) < 1E-8;
+	// 	// ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, distance, use ? "TRUE" : "FALSE", cls);
+	// }
+	// else if (boosting)
+	// {
+	// 	ROS_DEBUG("...predicting with boosting tree");
+	// 	float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
+	// 	float cls = boosting->predict(sample);
+	// 	// use = abs(cls - 1) < 1E-8;
+	// 	// ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
+	// }
 
-	if (svm)
-	{
-		ROS_DEBUG("...predicting with SVM");
-		float distance = svm->predict(sample, true);
-		float cls = svm->predict(sample, false);
-		use = abs(cls - 1) < 1E-8;
-		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, distance, use ? "TRUE" : "FALSE", cls);
-	}
-	else if (boosting)
-	{
-		ROS_DEBUG("...predicting with boosting tree");
-		float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
-		float cls = boosting->predict(sample);
-		use = abs(cls - 1) < 1E-8;
-		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
-	}
-
-	return use;
+	return 0;
 }
 
 
@@ -417,33 +474,102 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 	std::vector<GraspData> grasps;
 	DEBUG_points_.clear();
 
+
 	ROS_DEBUG("grasp points size: %zu", points_.size());
 
+
+	// Collect grasping candidate's data
+	std::vector<CandidateData> data;
 	float angleStep = M_PI / nsplits;
 	size_t npoints = points_.size();
+
 	for (size_t i = 0; i < npoints; i++)
 	{
 		pr2_grasping::GraspingPoint point = points_[i];
 		for (int j = 0; j < nsplits; j++)
 		{
+			// Generate a grasping pose
 			float angle = j * angleStep;
-			if (usePoint(point.label, angle))
-			{
-				// Synthesize the actual grasp
-				geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
-				std::string id = GRASP_ID + boost::lexical_cast<std::string>(pointIdx) + "_" + boost::lexical_cast<std::string>(j) + "_" + boost::lexical_cast<std::string>(i);
-				moveit_msgs::Grasp grasp = genGrasp(id, side_, graspingPose, OBJECT_TARGET, OBJECT_SUPPORT);
+			geometry_msgs::PoseStamped graspingPose = genGraspingPose(point, angle);
 
-				grasps.push_back(GraspData(grasp, angle, point.label));
+			pr2_grasping::DescriptorCalc desc;
+			desc.request.target = graspingPose.pose;
+			ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
-				/***** FOR DEBUG ONLY *****/
-				geometry_msgs::PoseStamped gp = graspingPose;
-				gp.pose.position = point.position;
-				DEBUG_points_.push_back(gp);
-			}
+			CandidateData candidate;
+			candidate.pose = graspingPose;
+			candidate.descriptor = desc.response;
+			candidate.angle = angle;
+			candidate.indexPoint = i;
+			candidate.indexAngle = j;
+			data.push_back(candidate);
+		}
+	}
+
+
+	std::vector<CandidateData> candidates;
+	std::vector<CandidateData>::iterator start, finish;
+
+
+	// Produce the grasping candidates
+	if (usePredictions)
+	{
+		// Compute the score for each grasp pose
+		std::vector<std::pair<size_t, float> > predictions;
+		for (size_t i = 0; i < data.size(); i++)
+			predictions.push_back(std::make_pair(i, getPredictionScore(data[i].descriptor)));
+
+		// Sort the predictions according to the score
+		std::sort(predictions.begin(), predictions.end(),
+				  boost::bind(&std::pair<size_t, float>::second, _1) < boost::bind(&std::pair<size_t, float>::second, _2));
+
+
+		if (debugEnabled_)
+		{
+			LOGD << "Sorted predictions:";
+			for (size_t i = 0; i < predictions.size(); i++)
+				LOGD << "\tindex: " << predictions[i].first << " -- score: " << predictions[i].second;
 		}
 
-		pointIdx++;
+
+		// Select the required number or predictions
+		for (int i  = 0; i < npredictions && i < (int)predictions.size(); i++)
+			candidates.push_back(data[predictions[i].first]);
+		start = candidates.begin();
+		finish = candidates.end();
+
+		LOGD << "Selected " << candidates.size() << " predictions";
+	}
+	else
+	{
+		start = data.begin();
+		finish = data.end();
+	}
+
+
+	// Finally, generate the grasping candidates
+	std::map<int, int> trackedPoints;
+	for (std::vector<CandidateData>::iterator it = start; start != finish; start++)
+	{
+		// Track the number of grasping points used
+		if (trackedPoints.find(it->indexPoint) == trackedPoints.end())
+			trackedPoints[it->indexPoint] = pointIdx++;
+
+
+		std::string id = GRASP_ID
+						 + boost::lexical_cast<std::string>(trackedPoints[it->indexPoint])
+						 + "_" + boost::lexical_cast<std::string>(it->indexPoint)
+						 + "_" + boost::lexical_cast<std::string>(it->indexAngle);
+		moveit_msgs::Grasp grasp = genGrasp(id, side_, it->pose, OBJECT_TARGET, OBJECT_SUPPORT);
+
+
+		grasps.push_back(GraspData(grasp, it->descriptor, it->angle, it->point.label));
+
+
+		/***** FOR DEBUG ONLY *****/
+		geometry_msgs::PoseStamped gp = it->pose;
+		gp.pose.position = it->point.position;
+		DEBUG_points_.push_back(gp);
 	}
 
 	return grasps;
@@ -565,9 +691,9 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 					ROS_INFO("...attempt failed, skipping evaluation");
 
 
-				pr2_grasping::DescriptorCalc desc;
-				desc.request.target = grasps[i].grasp.grasp_pose.pose;
-				ros::service::call("/pr2_grasping/descriptor_calculator", desc);
+				// pr2_grasping::DescriptorCalc desc;
+				// desc.request.target = grasps[i].grasp.grasp_pose.pose;
+				// ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 
 				/********** Store the result **********/
@@ -580,7 +706,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 								nsplits,
 								(M_PI / nsplits),
 								code,
-								desc.response);
+								grasps[i].descriptor);
 			}
 
 
@@ -699,7 +825,10 @@ void armAbortedCallback(const control_msgs::FollowJointTrajectoryActionResult &m
 /**************************************************/
 void loadClassifier()
 {
-	std::string location = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["grasper"]["classifier"]["location"].as<std::string>();
+	npredictions = Config::get()["grasper"]["predictions"]["npredictions"].as<int>();
+
+
+	std::string location = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["grasper"]["predictions"]["classifier"].as<std::string>();
 	ROS_INFO("Loading classifier at %s", location.c_str());
 
 	YAML::Node file = YAML::LoadFile(location);
@@ -744,7 +873,8 @@ int main(int _argn, char **_argv)
 	mockExecution = Config::get()["grasper"]["mockExecution"].as<bool>();
 
 	// Load the classifier if requested
-	if (Config::get()["grasper"]["classifier"]["use"].as<bool>())
+	usePredictions = Config::get()["grasper"]["usePredictions"].as<bool>();
+	if (usePredictions)
 		loadClassifier();
 
 

@@ -84,11 +84,8 @@ analyzer:
 
 ##### grasper node options #####
 grasper:
-    # parameters regarding the use of a previously trained classifier for grasps
-    classifier:
-        use: true
-        npoints: 3 # number of grasping points to be generated
-        location: config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
+    # flag to indicate to use predictions or process all the grasping points
+    usePredictions: true
     # arm used for grasping tasks
     arm: right # right or left
     # margin used for the collision object
@@ -99,6 +96,10 @@ grasper:
     angleSplits: 4
     # mocks the grasp routine without actually moving the robot
     mockExecution: false
+    # parameters regarding the use of predictions for the outcome of the grasping points
+    predictions:
+        npredictions: 1 # number of predictions to produce
+        classifier: config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
     ##### descriptor calculation params #####
     descriptor:
         type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
