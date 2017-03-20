@@ -439,24 +439,25 @@ void timerCallback(const ros::TimerEvent &event_)
 /**************************************************/
 float getPredictionScore(const pr2_grasping::DescriptorCalc::Response &descriptor_)
 {
-	// cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
+	size_t descSize = descriptor_.descriptor.size();
+	cv::Mat sample = cv::Mat(1, descSize, CV_32FC1);
 
-	// if (svm)
-	// {
-	// 	ROS_DEBUG("...predicting with SVM");
-	// 	float distance = svm->predict(sample, true);
-	// 	float cls = svm->predict(sample, false);
-	// 	// use = abs(cls - 1) < 1E-8;
-	// 	// ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, distance, use ? "TRUE" : "FALSE", cls);
-	// }
-	// else if (boosting)
-	// {
-	// 	ROS_DEBUG("...predicting with boosting tree");
-	// 	float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
-	// 	float cls = boosting->predict(sample);
-	// 	// use = abs(cls - 1) < 1E-8;
-	// 	// ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
-	// }
+	float label = -1;
+	float score = 0;
+	if (svm)
+	{
+		ROS_DEBUG("...predicting with SVM");
+		score = -svm->predict(sample, true); // - sign so the bigger the distance the more likely class 1
+		label = svm->predict(sample, false);
+	}
+	else if (boosting)
+	{
+		ROS_DEBUG("...predicting with boosting tree");
+		score = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
+		label = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, false);
+	}
+
+	ROS_DEBUG("...prediction  -->  class: %.0f - score: %.3f", label, score);
 
 	return 0;
 }
