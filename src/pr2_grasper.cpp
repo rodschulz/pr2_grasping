@@ -407,36 +407,6 @@ void timerCallback(const ros::TimerEvent &event_)
 
 
 /**************************************************/
-// bool usePoint(const int label_, const float angle_)
-// {
-// 	bool use = true;
-
-// 	cv::Mat sample = cv::Mat(1, 2, CV_32FC1);
-// 	sample.at<float>(0, 0) = label_;
-// 	sample.at<float>(0, 1) = angle_;
-
-// 	if (svm)
-// 	{
-// 		ROS_DEBUG("...predicting with SVM");
-// 		float distance = svm->predict(sample, true);
-// 		float cls = svm->predict(sample, false);
-// 		use = abs(cls - 1) < 1E-8;
-// 		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, distance, use ? "TRUE" : "FALSE", cls);
-// 	}
-// 	else if (boosting)
-// 	{
-// 		ROS_DEBUG("...predicting with boosting tree");
-// 		float votes = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
-// 		float cls = boosting->predict(sample);
-// 		use = abs(cls - 1) < 1E-8;
-// 		ROS_DEBUG("...prediction: (%d, %.2f): %.3f / %s (%.0f)", label_, angle_, votes, use ? "TRUE" : "FALSE", cls);
-// 	}
-
-// 	return use;
-// }
-
-
-/**************************************************/
 float getPredictionScore(const pr2_grasping::DescriptorCalc::Response &descriptor_)
 {
 	size_t descSize = descriptor_.descriptor.size();
@@ -495,6 +465,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 
 			pr2_grasping::DescriptorCalc desc;
 			desc.request.target = graspingPose.pose;
+			desc.request.angle.data = angle;
 			ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 			CandidateData candidate;

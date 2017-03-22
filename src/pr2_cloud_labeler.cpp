@@ -382,8 +382,11 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 {
 	if (writtenCloud)
 	{
+		ROS_INFO("Computing descriptor on-demand");
+
 		// Extract the target point
 		int nearest = GraspingUtils::findNearestPoint(writtenCloud, request_.target);
+		ROS_DEBUG("\ttarget point: %d", nearest);
 
 		// Calculate the descriptor
 		DescriptorParamsPtr params = Config::getGraspingDescriptorParams();
@@ -391,34 +394,37 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 
 		if (params->type == Params::DESCRIPTOR_DCH)
 		{
+			DCHParams *dchParams = dynamic_cast<DCHParams *>(params.get());
+			dchParams->angle = request_.angle.data;
 			std::vector<BandPtr> desc = DCH::calculateDescriptor(writtenCloud, params, nearest);
 
 			size_t nbands = desc.size();
 			size_t bandSize = desc[0]->descriptor.size();
 			size_t descriptorSize = nbands * bandSize;
 
+			ROS_DEBUG("\tDCH computed (size: %zu - angle: %f)", descriptorSize, dchParams->angle);
 
-			DCHParams *pars = dynamic_cast<DCHParams *>(params.get());
-			if (pars != NULL)
+			if (dchParams != NULL)
 			{
 				response_.descriptor.resize(descriptorSize);
 				response_.index.data = nearest;
-				response_.params.searchRadius = pars->searchRadius;
-				response_.params.bandNumber = pars->bandNumber;
-				response_.params.bandWidth = pars->bandWidth;
-				response_.params.bidirectional = pars->bidirectional;
-				response_.params.useProjection = pars->useProjection;
-				response_.params.binNumber = pars->binNumber;
-				response_.params.stat = pars->stat;
+				response_.params.searchRadius = dchParams->searchRadius;
+				response_.params.bandNumber = dchParams->bandNumber;
+				response_.params.bandWidth = dchParams->bandWidth;
+				response_.params.bidirectional = dchParams->bidirectional;
+				response_.params.useProjection = dchParams->useProjection;
+				response_.params.binNumber = dchParams->binNumber;
+				response_.params.stat = dchParams->stat;
 			}
 
 			// Copy data to the msg
+			ROS_DEBUG("\tcopying message");
 			for (size_t band = 0; band < nbands; band++)
 				for (size_t seq = 0; seq < bandSize; seq++)
 					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
 		}
 		else
-			ROS_WARN("Using unimplemented descriptor type (%s)", Params::descType[params->type].c_str());
+			ROS_WARN("Unable to compute required descriptor type (%s)", Params::descType[params->type].c_str());
 	}
 
 	return true;
