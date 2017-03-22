@@ -1,5 +1,8 @@
 # Descriptor calculation target
 geometry_msgs/Pose target
+
+# Angle used for the calculation of DCH
+std_msgs/Float32 angle
 ---
 # Index of the point used for calculation
 std_msgs/Int32 index
