@@ -407,29 +407,33 @@ void timerCallback(const ros::TimerEvent &event_)
 
 
 /**************************************************/
-float getPredictionScore(const pr2_grasping::DescriptorCalc::Response &descriptor_)
+std::pair<int, float> getPrediction(const pr2_grasping::DescriptorCalc::Response &descriptor_)
 {
 	size_t descSize = descriptor_.descriptor.size();
-	cv::Mat sample = cv::Mat(1, descSize, CV_32FC1);
+	cv::Mat sample = cv::Mat::zeros(1, descSize, CV_32FC1);
 
+	// Copy descriptor
+	for (size_t i = 0; i < descSize; i++)
+		sample.at<float>(0, i) = descriptor_.descriptor[i].data;
+	// ROS_DEBUG_STREAM("\t" << sample);
+
+	// Make predictions
 	float label = -1;
 	float score = 0;
 	if (svm)
 	{
-		ROS_DEBUG("...predicting with SVM");
 		score = -svm->predict(sample, true); // - sign so the bigger the distance the more likely class 1
 		label = svm->predict(sample, false);
+		ROS_DEBUG("...SVM prediction  -->  class: %.0f - score: %.3f", label, score);
 	}
 	else if (boosting)
 	{
-		ROS_DEBUG("...predicting with boosting tree");
 		score = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, true);
 		label = boosting->predict(sample, cv::Mat(), cv::Range::all(), false, false);
+		ROS_DEBUG("...BOOST prediction  -->  class: %.0f - score: %.3f", label, score);
 	}
 
-	ROS_DEBUG("...prediction  -->  class: %.0f - score: %.3f", label, score);
-
-	return 0;
+	return std::make_pair((int)label, score);
 }
 
 
@@ -489,18 +493,25 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		// Compute the score for each grasp pose
 		std::vector<std::pair<size_t, float> > predictions;
 		for (size_t i = 0; i < data.size(); i++)
-			predictions.push_back(std::make_pair(i, getPredictionScore(data[i].descriptor)));
+		{
+			std::pair<int, float> prediction = getPrediction(data[i].descriptor);
+
+			// Store only predictions of successful grasp (class == 1)
+			if (prediction.first == 1)
+				predictions.push_back(std::make_pair(i, prediction.second));
+		}
 
 		// Sort the predictions according to the score
+		ROS_DEBUG("Sorting %zu predictions", predictions.size());
 		std::sort(predictions.begin(), predictions.end(),
 				  boost::bind(&std::pair<size_t, float>::second, _1) < boost::bind(&std::pair<size_t, float>::second, _2));
 
 
 		if (debugEnabled_)
 		{
-			LOGD << "Sorted predictions:";
+			ROS_DEBUG("Sorted predictions:");
 			for (size_t i = 0; i < predictions.size(); i++)
-				LOGD << "\tindex: " << predictions[i].first << " -- score: " << predictions[i].second;
+				ROS_DEBUG("\tindex: %zu -- score: %f", predictions[i].first, predictions[i].second);
 		}
 
 
@@ -510,7 +521,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		start = candidates.begin();
 		finish = candidates.end();
 
-		LOGD << "Selected " << candidates.size() << " predictions";
+		ROS_DEBUG("Selected %zu predictions", candidates.size());
 	}
 	else
 	{
@@ -583,7 +594,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
 			ROS_INFO("...attempt id: %s", IO::nextExperimentId(trackedObject).c_str());
-			ROS_DEBUG("grasp id: %s -- label: %d", grasps[i].grasp.id.c_str(), grasps[i].label);
+			ROS_DEBUG("grasp id: %s -- cluster label: %d", grasps[i].grasp.id.c_str(), grasps[i].label);
 
 
 			ROS_INFO("...clearing scene");

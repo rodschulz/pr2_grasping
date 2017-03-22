@@ -403,6 +403,7 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 			size_t descriptorSize = nbands * bandSize;
 
 			ROS_DEBUG("\tDCH computed (size: %zu - angle: %f)", descriptorSize, dchParams->angle);
+			// ROS_DEBUG_STREAM("" << desc);
 
 			if (dchParams != NULL)
 			{
@@ -422,6 +423,8 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 			for (size_t band = 0; band < nbands; band++)
 				for (size_t seq = 0; seq < bandSize; seq++)
 					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
+
+			// ROS_DEBUG_STREAM("" << response_);
 		}
 		else
 			ROS_WARN("Unable to compute required descriptor type (%s)", Params::descType[params->type].c_str());
