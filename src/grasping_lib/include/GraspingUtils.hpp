@@ -10,6 +10,7 @@
 #include <pcl/point_types.h>
 #include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/DescriptorCalc.h>
+#include <moveit_msgs/Grasp.h>
 
 
 #define OBJECT_TARGET		"object_target"
@@ -54,6 +55,39 @@ struct CandidateData
 		angle = other_.angle;
 		indexPoint = other_.indexPoint;
 		indexAngle = other_.indexAngle;
+	}
+};
+
+
+// Structure holding the data regarding a grasp
+struct GraspData
+{
+	moveit_msgs::Grasp grasp;
+	pr2_grasping::DescriptorCalc::Response descriptor;
+	float score;
+	float angle;
+	int label;
+
+	GraspData(const moveit_msgs::Grasp &grasp_,
+			  const pr2_grasping::DescriptorCalc::Response &descriptor_,
+			  const float score_,
+			  const float angle_,
+			  const int label_)
+	{
+		grasp = grasp_;
+		descriptor = descriptor_;
+		score = score_;
+		angle = angle_;
+		label = label_;
+	}
+
+	GraspData(const GraspData &other_)
+	{
+		grasp = other_.grasp;
+		descriptor = other_.descriptor;
+		score = other_.score;
+		angle = other_.angle;
+		label = other_.label;
 	}
 };
 

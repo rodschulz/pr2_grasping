@@ -23,49 +23,55 @@ std::string IO::nextExperimentId(const std::string &targetObject_)
 	return experimentId;
 }
 
-void IO::saveResults(const std::string &targetObject_,
-					 const bool attemptCompleted_,
-					 const bool attemptSuccessful_,
-					 const int clusterLabel_,
-					 const float gripperAngle_,
-					 const moveit_msgs::Grasp &grasp_,
-					 const int gripperAngleSplitNum_,
-					 const float gripperAngleStep_,
+void IO::saveResults(const std::string &object_,
+					 const bool completed_,
+					 const bool successful_,
+					 const GraspData &gdata_,
 					 const moveit::planning_interface::MoveItErrorCode &errCode_,
-					 const pr2_grasping::DescriptorCalc::Response &descriptor_)
+					 const bool predicted_,
+					 const std::string classifier_,
+					 const int nsplits_,
+					 const float angleStep_)
 {
 	std::string filename = PkgUtils::getOutputPath() + IO::getExperimentId() + ".yaml";
 
 	ROS_DEBUG_STREAM("Saving to: " << filename);
 
 	std::vector<double> desc;
-	desc.resize(descriptor_.descriptor.size());
-	for (size_t i = 0; i < descriptor_.descriptor.size(); i++)
-		desc[i] = descriptor_.descriptor[i].data;
+	desc.resize(gdata_.descriptor.descriptor.size());
+	for (size_t i = 0; i < gdata_.descriptor.descriptor.size(); i++)
+		desc[i] = gdata_.descriptor.descriptor[i].data;
 
 	// generate a YAML file with the results
 	YAML::Emitter emitter;
 	emitter << YAML::BeginMap
-			<< YAML::Key << "target_object" << YAML::Value <<  targetObject_
-			<< YAML::Key << "cluster_label" << YAML::Value << clusterLabel_
+			<< YAML::Key << "target_object" << YAML::Value <<  object_
+			<< YAML::Key << "cluster_label" << YAML::Value << gdata_.label
+
+			<< YAML::Key << "prediction"
+			<< YAML::BeginMap
+			<< YAML::Key << "used" << YAML::Value << predicted_
+			<< YAML::Key << "score" << YAML::Value << gdata_.score
+			<< YAML::Key << "classifier" << YAML::Value << classifier_
+			<< YAML::EndMap
 
 			<< YAML::Key << "result"
 			<< YAML::BeginMap
-			<< YAML::Key << "attempt_completed" << YAML::Value << attemptCompleted_
-			<< YAML::Key << "success" << YAML::Value << attemptSuccessful_
+			<< YAML::Key << "attempt_completed" << YAML::Value << completed_
+			<< YAML::Key << "success" << YAML::Value << successful_
 			<< YAML::Key << "pick_error_code" << YAML::Value << errCode_.val
 			<< YAML::EndMap
 
-			<< YAML::Key << "descriptor" << YAML::Value << descriptor_
+			<< YAML::Key << "descriptor" << YAML::Value << gdata_.descriptor
 
 			<< YAML::Key << "orientation"
 			<< YAML::BeginMap
-			<< YAML::Key << "angle" << YAML::Value << gripperAngle_
-			<< YAML::Key << "split_number" << YAML::Value << gripperAngleSplitNum_
-			<< YAML::Key << "angle_step" << YAML::Value << gripperAngleStep_
+			<< YAML::Key << "angle" << YAML::Value << gdata_.angle
+			<< YAML::Key << "split_number" << YAML::Value << nsplits_
+			<< YAML::Key << "angle_step" << YAML::Value << angleStep_
 			<< YAML::EndMap
 
-			<< YAML::Key << "grasp" << YAML::Value << grasp_
+			<< YAML::Key << "grasp" << YAML::Value << gdata_.grasp
 			<< YAML::EndMap;
 
 	std::ofstream output;

@@ -12,6 +12,7 @@
 #include <yaml-cpp/yaml.h>
 #include <moveit/move_group_interface/move_group.h>
 #include <DescriptorParams.hpp>
+#include <GraspingUtils.hpp>
 
 
 class IO
@@ -24,16 +25,15 @@ public:
 	static std::string getExperimentId();
 
 	/**************************************************/
-	static void saveResults(const std::string &targetObject_,
-							const bool attemptCompleted_,
-							const bool attemptSuccessful_,
-							const int clusterLabel_,
-							const float gripperAngle_,
-							const moveit_msgs::Grasp &grasp_,
-							const int gripperAngleSplitNum_,
-							const float gripperAngleStep_,
+	static void saveResults(const std::string &object_,
+							const bool completed_,
+							const bool successful_,
+							const GraspData &gdata_,
 							const moveit::planning_interface::MoveItErrorCode &errCode_,
-							const pr2_grasping::DescriptorCalc::Response &descriptor_);
+							const bool predicted_,
+							const std::string classifier_,
+							const int nsplits_,
+							const float angleStep_);
 private:
 	IO();
 	~IO();

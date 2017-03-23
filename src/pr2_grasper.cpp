@@ -43,39 +43,6 @@ enum GripperState
 };
 
 
-/***** Structure holding the data relative to one grasp *****/
-struct GraspData
-{
-	moveit_msgs::Grasp grasp;
-	pr2_grasping::DescriptorCalc::Response descriptor;
-	float score;
-	float angle;
-	int label;
-
-	GraspData(const moveit_msgs::Grasp &grasp_,
-			  const pr2_grasping::DescriptorCalc::Response &descriptor_,
-			  const float score_,
-			  const float angle_,
-			  const int label_)
-	{
-		grasp = grasp_;
-		descriptor = descriptor_;
-		score = score_;
-		angle = angle_;
-		label = label_;
-	}
-
-	GraspData(const GraspData &other_)
-	{
-		grasp = other_.grasp;
-		descriptor = other_.descriptor;
-		score = other_.score;
-		angle = other_.angle;
-		label = other_.label;
-	}
-};
-
-
 /***** Global variables *****/
 ros::Publisher posePub, cancelPub, scenePub, statusPub;
 boost::mutex pmutex, gmutex;
@@ -93,6 +60,7 @@ std::string trackedObject = "";
 std::string supportObject = "";
 
 bool usePredictions = false;
+std::string classifierName = "";
 int npredictions = 0;
 SVMPtr svm = SVMPtr();
 BoostingPtr boosting = BoostingPtr();
@@ -675,13 +643,12 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 				IO::saveResults(trackedObject,
 								completed,
 								eval.response.result,
-								grasps[i].label,
-								grasps[i].angle,
-								grasps[i].grasp,
-								nsplits,
-								(M_PI / nsplits),
+								grasps[i],
 								code,
-								grasps[i].descriptor);
+								usePredictions,
+								classifierName,
+								nsplits,
+								(M_PI / nsplits));
 			}
 
 
@@ -803,7 +770,8 @@ void loadClassifier()
 	npredictions = Config::get()["grasper"]["predictions"]["npredictions"].as<int>();
 
 
-	std::string location = ros::package::getPath(PACKAGE_NAME) + "/" + Config::get()["grasper"]["predictions"]["classifier"].as<std::string>();
+	classifierName = Config::get()["grasper"]["predictions"]["classifier"].as<std::string>();
+	std::string location = ros::package::getPath(PACKAGE_NAME) + "/" + classifierName;
 	ROS_INFO("Loading classifier at %s", location.c_str());
 
 	YAML::Node file = YAML::LoadFile(location);

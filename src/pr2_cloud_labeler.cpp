@@ -384,7 +384,7 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 	if (writtenCloud)
 	{
 		static size_t k = 0;
-		ROS_INFO("Computing descriptor on-demand (%zu)", k);
+		ROS_INFO("Computing descriptor on-demand (%zu)", k++);
 
 		// Extract the target point
 		int nearest = GraspingUtils::findNearestPoint(writtenCloud, request_.target);
