@@ -38,7 +38,7 @@ labeler:
     # sampling voxel size (value < 0 to don't downsample)
     voxelSize: -1
     # location of the codebook file
-    codebookLocation: config/codebooks/codebook_200-32_c7_1E-04_opencv.dat
+    codebookLocation: config/codebooks/codebook_200-32_c7_1E-04_kmeans.dat
     # clipping plane position in Z axis
     clippingPlaneZ: 0.48
     # indicates if the object's cloud has to be stored
@@ -110,7 +110,7 @@ grasper:
           bidirectional: false
           useProjection: false
           binNumber: 3 # 3 bins of 0.01 mts
-          stat: 'hist10' # mean, median, hist10, hist20, hb20, hb10
+          stat: 'hist20' # mean, median, hist10, hist20, hb20, hb10
         SHOT:
           searchRadius: 0.035 # mts
         USC:
