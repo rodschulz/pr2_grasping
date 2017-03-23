@@ -8,6 +8,7 @@ add_library(grasping ${GRASPING_SRC})
 target_link_libraries(grasping 
 		utils
 		factories
+		descriptor
 		${PCL_LIBRARIES}
 		${OpenCV_LIBS}
 		${catkin_LIBRARIES})

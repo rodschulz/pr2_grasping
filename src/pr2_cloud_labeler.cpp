@@ -378,7 +378,8 @@ void labelCloud(const float voxelSize_,
 
 /**************************************************/
 bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
-					   pr2_grasping::DescriptorCalc::Response &response_)
+					   pr2_grasping::DescriptorCalc::Response &response_,
+					   const bool debugEnabled_)
 {
 	if (writtenCloud)
 	{
@@ -425,6 +426,9 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
 
 			// ROS_DEBUG_STREAM("" << response_);
+
+			if (debugEnabled_)
+				GraspingUtils::generateGraspCloud(writtenCloud, dchParams, request_.target, nearest, desc);
 		}
 		else
 			ROS_WARN("Unable to compute required descriptor type (%s)", Params::descType[params->type].c_str());
@@ -491,7 +495,7 @@ int main(int argn_, char **argv_)
 	ROS_INFO("Starting labeler service");
 	ros::ServiceServer labelerService = handler.advertiseService("/pr2_grasping/cloud_labeler", scheduleLabeling);
 	ROS_INFO("Starting calculation service");
-	ros::ServiceServer calculationService = handler.advertiseService("/pr2_grasping/descriptor_calculator", computeDescriptor);
+	ros::ServiceServer calculationService = handler.advertiseService<pr2_grasping::DescriptorCalc::Request, pr2_grasping::DescriptorCalc::Response>("/pr2_grasping/descriptor_calculator", boost::bind(computeDescriptor, _1, _2, debugEnabled));
 
 
 	// Spin at 20 Hz

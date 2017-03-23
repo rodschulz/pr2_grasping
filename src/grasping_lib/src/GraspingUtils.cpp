@@ -7,8 +7,13 @@
 #include <pcl/filters/impl/plane_clipper3D.hpp>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
+#include <pcl/io/pcd_io.h>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
+#include "CloudFactory.hpp"
+#include "PkgUtils.hpp"
+#include "Extractor.hpp"
+#include "Config.hpp"
 
 
 bool GraspingUtils::getTransformation(tf::StampedTransform &transform_,
@@ -196,4 +201,75 @@ int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr
 	}
 
 	return target;
+}
+
+void GraspingUtils::generateGraspCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+									   const DCHParams *dchParams_,
+									   const geometry_msgs::Pose &target_,
+									   const int nearest_,
+									   const std::vector<BandPtr> &bands_)
+{
+	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr grasp = CloudFactory::createColorCloud(cloud_, Utils::palette12(0));
+
+
+	// Draw the vicinity used for computation
+	pcl::PointCloud<pcl::PointNormal>::Ptr patch = Extractor::getNeighbors(cloud_, cloud_->at(nearest_), dchParams_->searchRadius);
+	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr patchCloud = CloudFactory::createColorCloud(patch, COLOR_SLATE_GRAY);
+	*grasp += *patchCloud;
+
+
+	// Draw the band axes
+	for (size_t b = 0; b < bands_.size(); b++)
+	{
+		pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr lineCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
+		for (float t = (dchParams_->bidirectional ? -dchParams_->searchRadius : 0);
+				t <= dchParams_->searchRadius;
+				t += dchParams_->searchRadius / 50)
+		{
+			Eigen::Vector3f point = bands_[b]->axis.pointAt(t);
+			lineCloud->push_back(PointFactory::createPointXYZRGBNormal(point.x(), point.y(), point.z(), 0, 0, 0, 0, (PointColor)Utils::palette12(b + 1)));
+		}
+
+		*grasp += *lineCloud;
+	}
+
+
+	float x = target_.position.x;
+	float y = target_.position.y;
+	float z = target_.position.z;
+
+	float dx = target_.orientation.x;
+	float dy = target_.orientation.y;
+	float dz = target_.orientation.z;
+	float dw = target_.orientation.w;
+
+	Eigen::Vector3f origin = Eigen::Vector3f(x, y, z);
+	Eigen::Vector3f direction = Eigen::Quaternionf(dw, dx, dy, dz) * Eigen::Vector3f(1, 0, 0);
+	Eigen::ParametrizedLine<float, 3> line(origin, direction);
+
+
+	// Draw a line showing the approach vector
+	float delta = 0.2;
+	float step = 0.001;
+	for (float t = step; t < delta; t += step)
+	{
+		Eigen::Vector3f p = line.pointAt(t);
+		grasp->push_back(PointFactory::createPointXYZRGBNormal(p.x(), p.y(), p.z(), 0, 0, 0, 0, COLOR_LIME));
+	}
+
+
+	// Draw the nearest point
+	float xnearest = grasp->at(nearest_).x;
+	float ynearest = grasp->at(nearest_).y;
+	float znearest = grasp->at(nearest_).z;
+	grasp->push_back(PointFactory::createPointXYZRGBNormal(xnearest, ynearest, znearest, 0, 0, 0, 0, COLOR_YELLOW));
+
+
+	// Draw the target point
+	grasp->push_back(PointFactory::createPointXYZRGBNormal(x, y, z, 0, 0, 0, 0, COLOR_RED));
+
+
+	static long idx = 0;
+	std::string outputDir = PkgUtils::getOutputPath();
+	pcl::io::savePCDFileASCII(outputDir + DEBUG_PREFIX + boost::lexical_cast<std::string>(idx++) + "_grasp.pcd", *grasp);
 }

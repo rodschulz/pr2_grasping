@@ -8,6 +8,8 @@
 #include <tf/transform_listener.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include "DescriptorParams.hpp"
+#include "Band.hpp"
 
 
 #define OBJECT_TARGET		"object_target"
@@ -67,6 +69,13 @@ public:
 	/**************************************************/
 	static int findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
 								const geometry_msgs::Pose &target_);
+
+	/**************************************************/
+	static void generateGraspCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+								   const DCHParams *dchParams_,
+								   const geometry_msgs::Pose &target_,
+								   const int nearest_,
+								   const std::vector<BandPtr> &bands_);
 
 private:
 	// Constructor

@@ -469,7 +469,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 
 			pr2_grasping::DescriptorCalc desc;
 			desc.request.target = graspingPose.pose;
-			desc.request.angle.data = angle;
+			desc.request.angle.data = M_PI / 2 - angle; // pi/2 to align the zero band
 			ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 			CandidateData candidate;
@@ -504,14 +504,14 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		// Sort the predictions according to the score
 		ROS_DEBUG("Sorting %zu predictions", predictions.size());
 		std::sort(predictions.begin(), predictions.end(),
-				  boost::bind(&std::pair<size_t, float>::second, _1) < boost::bind(&std::pair<size_t, float>::second, _2));
+				  boost::bind(&std::pair<size_t, float>::second, _1) > boost::bind(&std::pair<size_t, float>::second, _2));
 
 
 		if (debugEnabled_)
 		{
 			ROS_DEBUG("Sorted predictions:");
 			for (size_t i = 0; i < predictions.size(); i++)
-				ROS_DEBUG("\tindex: %zu -- score: %f", predictions[i].first, predictions[i].second);
+				ROS_DEBUG("\tindex: %3zu -- score: %.3f", predictions[i].first, predictions[i].second);
 		}
 
 
