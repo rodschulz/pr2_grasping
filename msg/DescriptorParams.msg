@@ -2,13 +2,13 @@
 int32 type
 
 # Search radius used in the KNN search
-float64 searchRadius
+float32 searchRadius
 
 # Number of bands in the descriptor
 int32 bandNumber
 
 # Width of each band
-float64 bandWidth
+float32 bandWidth
 
 # True if bands are bidirectional
 bool bidirectional

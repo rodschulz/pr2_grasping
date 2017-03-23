@@ -67,6 +67,7 @@ add_message_files(
 		EvaluationStatus.msg
 		GraspingData.msg
 		GraspingPoint.msg
+		Line.msg
 		ObjectCloudData.msg
 )
 

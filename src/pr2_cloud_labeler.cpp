@@ -396,6 +396,14 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 		if (params->type == Params::DESCRIPTOR_DCH)
 		{
 			DCHParams *dchParams = dynamic_cast<DCHParams *>(params.get());
+			if (dchParams == NULL)
+			{
+				ROS_ERROR("Unable to cast parameters to DCH params");
+				return false;
+			}
+
+
+			// Compute the descriptor
 			dchParams->angle = request_.angle.data;
 			std::vector<BandPtr> desc = DCH::calculateDescriptor(writtenCloud, params, nearest);
 
@@ -404,38 +412,72 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 			size_t descriptorSize = nbands * bandSize;
 
 			ROS_DEBUG("\tDCH computed (size: %zu - angle: %f)", descriptorSize, dchParams->angle);
-			// ROS_DEBUG_STREAM("" << desc);
 
-			if (dchParams != NULL)
+
+			// Add params to the response
+			response_.descriptor.resize(descriptorSize);
+			response_.index.data = nearest;
+			response_.params.searchRadius = dchParams->searchRadius;
+			response_.params.bandNumber = dchParams->bandNumber;
+			response_.params.bandWidth = dchParams->bandWidth;
+			response_.params.bidirectional = dchParams->bidirectional;
+			response_.params.useProjection = dchParams->useProjection;
+			response_.params.binNumber = dchParams->binNumber;
+			response_.params.stat = dchParams->stat;
+
+
+			// Produce debug if requested
+			if (request_.sendDebug.data)
 			{
-				response_.descriptor.resize(descriptorSize);
-				response_.index.data = nearest;
-				response_.params.searchRadius = dchParams->searchRadius;
-				response_.params.bandNumber = dchParams->bandNumber;
-				response_.params.bandWidth = dchParams->bandWidth;
-				response_.params.bidirectional = dchParams->bidirectional;
-				response_.params.useProjection = dchParams->useProjection;
-				response_.params.binNumber = dchParams->binNumber;
-				response_.params.stat = dchParams->stat;
+				// Add band axes to the response
+				response_.bandAxes.resize(desc.size());
+				for (size_t band = 0; band < desc.size(); band++)
+				{
+					Eigen::Vector3f origin = desc[band]->axis.pointAt(0);
+					response_.bandAxes[band].origin.x = origin.x();
+					response_.bandAxes[band].origin.y = origin.y();
+					response_.bandAxes[band].origin.z = origin.z();
+
+					Eigen::Vector3f director = desc[band]->axis.pointAt(10);
+					response_.bandAxes[band].director.x = director.x();
+					response_.bandAxes[band].director.y = director.y();
+					response_.bandAxes[band].director.z = director.z();
+				}
+
+				// Add the point cloud to the response
+				pcl::toROSMsg(*writtenCloud, response_.cloud);
 			}
 
-			// Copy data to the msg
+
+			// Add descriptor data to the response
 			ROS_DEBUG("\tcopying message");
 			for (size_t band = 0; band < nbands; band++)
 				for (size_t seq = 0; seq < bandSize; seq++)
 					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
 
-			// ROS_DEBUG_STREAM("" << response_);
 
 			if (debugEnabled_)
 			{
+				std::vector<Eigen::ParametrizedLine<float, 3> > axes;
+				for (size_t band = 0; band < desc.size(); band++)
+					axes.push_back(desc[band]->axis);
+
 				static long idx = 0;
 				std::string filename = "computed_descriptor_" + boost::lexical_cast<std::string>(idx++);
-				GraspingUtils::generateGraspCloud(filename, writtenCloud, dchParams, request_.target, nearest, desc);
+				GraspingUtils::generateGraspCloud(filename,
+												  writtenCloud,
+												  dchParams->searchRadius,
+												  dchParams->bidirectional,
+												  request_.target,
+												  nearest,
+												  axes);
 			}
 		}
 		else
+		{
 			ROS_WARN("Unable to compute required descriptor type (%s)", Params::descType[params->type].c_str());
+			return false;
+		}
 	}
 
 	return true;

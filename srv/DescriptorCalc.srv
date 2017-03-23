@@ -3,7 +3,13 @@ geometry_msgs/Pose target
 
 # Angle used for the calculation of DCH
 std_msgs/Float32 angle
+
+# Flag indicating if data for debugging has to be send
+std_msgs/Bool sendDebug
 ---
+# Cloud used for the computation
+sensor_msgs/PointCloud2 cloud
+
 # Index of the point used for calculation
 std_msgs/Int32 index
 
@@ -12,3 +18,7 @@ std_msgs/Float64[] descriptor
 
 # Params used to compute the descriptor 
 pr2_grasping/DescriptorParams params
+
+# Band axes
+pr2_grasping/Line[] bandAxes
+

@@ -8,6 +8,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/search/kdtree.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include "Metric.hpp"
 #include "PointFactory.hpp"
 #include "CloudFactory.hpp"
@@ -204,30 +205,63 @@ int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr
 }
 
 void GraspingUtils::generateGraspCloud(const std::string &filename_,
+									   const CandidateData &candiate_)
+{
+	ROS_DEBUG("Transforming cloud");
+	// Transform cloud type
+	pcl::PointCloud<pcl::PointNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointNormal>());
+	pcl::fromROSMsg(candiate_.descriptor.cloud, *cloud);
+
+
+	ROS_DEBUG("Producing axes");
+	// Generate band axes
+	std::vector<Eigen::ParametrizedLine<float, 3> > axes;
+	for (size_t band = 0; band < candiate_.descriptor.bandAxes.size(); band++)
+	{
+		geometry_msgs::Point o = candiate_.descriptor.bandAxes[band].origin;
+		geometry_msgs::Point d = candiate_.descriptor.bandAxes[band].director;
+		axes.push_back(Eigen::ParametrizedLine<float, 3>(Eigen::Vector3f(o.x, o.y, o.z), Eigen::Vector3f(d.x, d.y, d.z).normalized()));
+	}
+
+
+	ROS_DEBUG("Calling method");
+	// Generate the cloud
+	GraspingUtils::generateGraspCloud(filename_,
+									  cloud,
+									  candiate_.descriptor.params.searchRadius,
+									  candiate_.descriptor.params.bidirectional,
+									  candiate_.pose.pose,
+									  candiate_.descriptor.index.data,
+									  axes);
+}
+
+
+void GraspingUtils::generateGraspCloud(const std::string &filename_,
 									   const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
-									   const DCHParams *dchParams_,
+									   const float searchRadius_,
+									   const bool bidirectional_,
 									   const geometry_msgs::Pose &target_,
 									   const int nearest_,
-									   const std::vector<BandPtr> &bands_)
+									   const std::vector<Eigen::ParametrizedLine<float, 3> > &bandsAxes_)
 {
 	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr grasp = CloudFactory::createColorCloud(cloud_, Utils::palette12(0));
 
 
 	// Draw the vicinity used for computation
-	pcl::PointCloud<pcl::PointNormal>::Ptr patch = Extractor::getNeighbors(cloud_, cloud_->at(nearest_), dchParams_->searchRadius);
+	pcl::PointCloud<pcl::PointNormal>::Ptr patch = Extractor::getNeighbors(cloud_, cloud_->at(nearest_), searchRadius_);
 	pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr patchCloud = CloudFactory::createColorCloud(patch, COLOR_SLATE_GRAY);
 	*grasp += *patchCloud;
 
 
 	// Draw the band axes
-	for (size_t b = 0; b < bands_.size(); b++)
+	for (size_t b = 0; b < bandsAxes_.size(); b++)
 	{
 		pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr lineCloud(new pcl::PointCloud<pcl::PointXYZRGBNormal>());
-		for (float t = (dchParams_->bidirectional ? -dchParams_->searchRadius : 0);
-				t <= dchParams_->searchRadius;
-				t += dchParams_->searchRadius / 50)
+		for (float t = (bidirectional_ ? -searchRadius_ : 0);
+				t <= searchRadius_;
+				t += searchRadius_ / 50)
 		{
-			Eigen::Vector3f point = bands_[b]->axis.pointAt(t);
+			Eigen::Vector3f point = bandsAxes_[b].pointAt(t);
 			lineCloud->push_back(PointFactory::createPointXYZRGBNormal(point.x(), point.y(), point.z(), 0, 0, 0, 0, (PointColor)Utils::palette12(b + 1)));
 		}
 

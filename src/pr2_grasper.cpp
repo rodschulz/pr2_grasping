@@ -6,9 +6,7 @@
 #include <ros/package.h>
 #include <tf/transform_listener.h>
 #include <pr2_grasping/GraspingData.h>
-#include <pr2_grasping/GraspingPoint.h>
 #include <pr2_grasping/CloudLabeler.h>
-#include <pr2_grasping/DescriptorCalc.h>
 #include <pr2_grasping/GazeboSetup.h>
 #include <pr2_grasping/GraspEvaluator.h>
 #include <pr2_grasping/GraspingGroup.h>
@@ -44,21 +42,25 @@ enum GripperState
 	STATE_STUCK
 };
 
+
 /***** Structure holding the data relative to one grasp *****/
 struct GraspData
 {
 	moveit_msgs::Grasp grasp;
 	pr2_grasping::DescriptorCalc::Response descriptor;
+	float score;
 	float angle;
 	int label;
 
 	GraspData(const moveit_msgs::Grasp &grasp_,
 			  const pr2_grasping::DescriptorCalc::Response &descriptor_,
+			  const float score_,
 			  const float angle_,
 			  const int label_)
 	{
 		grasp = grasp_;
 		descriptor = descriptor_;
+		score = score_;
 		angle = angle_;
 		label = label_;
 	}
@@ -67,34 +69,12 @@ struct GraspData
 	{
 		grasp = other_.grasp;
 		descriptor = other_.descriptor;
+		score = other_.score;
 		angle = other_.angle;
 		label = other_.label;
 	}
 };
 
-/***** Auxiliary structure to easy the grasping candidate generation process *****/
-struct CandidateData
-{
-	geometry_msgs::PoseStamped pose;
-	pr2_grasping::DescriptorCalc::Response descriptor;
-	pr2_grasping::GraspingPoint point;
-	float angle;
-	size_t indexPoint;
-	size_t indexAngle;
-
-	CandidateData()
-	{}
-
-	CandidateData(const CandidateData &other_)
-	{
-		pose = other_.pose;
-		descriptor = other_.descriptor;
-		point = other_.point;
-		angle = other_.angle;
-		indexPoint = other_.indexPoint;
-		indexAngle = other_.indexAngle;
-	}
-};
 
 /***** Global variables *****/
 ros::Publisher posePub, cancelPub, scenePub, statusPub;
@@ -415,7 +395,6 @@ std::pair<int, float> getPrediction(const pr2_grasping::DescriptorCalc::Response
 	// Copy descriptor
 	for (size_t i = 0; i < descSize; i++)
 		sample.at<float>(0, i) = descriptor_.descriptor[i].data;
-	// ROS_DEBUG_STREAM("\t" << sample);
 
 	// Make predictions
 	float label = -1;
@@ -470,6 +449,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 			pr2_grasping::DescriptorCalc desc;
 			desc.request.target = graspingPose.pose;
 			desc.request.angle.data = M_PI / 2 - angle; // pi/2 to align the zero band
+			desc.request.sendDebug.data = debugEnabled_;
 			ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 			CandidateData candidate;
@@ -495,6 +475,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		for (size_t i = 0; i < data.size(); i++)
 		{
 			std::pair<int, float> prediction = getPrediction(data[i].descriptor);
+			data[i].score = prediction.second;
 
 			// Store only predictions of successful grasp (class == 1)
 			if (prediction.first == 1)
@@ -539,20 +520,29 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 			trackedPoints[it->indexPoint] = pointIdx++;
 
 
+		// Generate id and grasp
 		std::string id = GRASP_ID
 						 + boost::lexical_cast<std::string>(trackedPoints[it->indexPoint])
 						 + "_" + boost::lexical_cast<std::string>(it->indexPoint)
 						 + "_" + boost::lexical_cast<std::string>(it->indexAngle);
 		moveit_msgs::Grasp grasp = genGrasp(id, side_, it->pose, OBJECT_TARGET, OBJECT_SUPPORT);
+		grasps.push_back(GraspData(grasp, it->descriptor, it->score, it->angle, it->point.label));
+		ROS_DEBUG("Producing grasp candidate '%s'", id.c_str());
 
 
-		grasps.push_back(GraspData(grasp, it->descriptor, it->angle, it->point.label));
+		if (debugEnabled_)
+		{
+			ROS_DEBUG("Generating grasping points array");
+			geometry_msgs::PoseStamped gp = it->pose;
+			gp.pose.position = it->point.position;
+			DEBUG_points_.push_back(gp);
 
+			ROS_DEBUG("Generating descriptor cloud");
+			std::string filename = id + "_descriptor";
+			GraspingUtils::generateGraspCloud(filename, *it);
 
-		/***** FOR DEBUG ONLY *****/
-		geometry_msgs::PoseStamped gp = it->pose;
-		gp.pose.position = it->point.position;
-		DEBUG_points_.push_back(gp);
+			ROS_DEBUG("DONE");
+		}
 	}
 
 	return grasps;
