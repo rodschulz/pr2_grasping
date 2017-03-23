@@ -302,5 +302,5 @@ void GraspingUtils::generateGraspCloud(const std::string &filename_,
 
 
 	std::string outputDir = PkgUtils::getOutputPath();
-	pcl::io::savePCDFileASCII(outputDir + DEBUG_PREFIX + filename_ + CLOUD_FILE_EXTENSION, *grasp);
+	pcl::io::savePCDFileASCII(outputDir + filename_ + CLOUD_FILE_EXTENSION, *grasp);
 }

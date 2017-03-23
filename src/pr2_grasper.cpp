@@ -52,6 +52,7 @@ float collisionMargin = 0.01;
 float graspPadding = 0.1;
 float nsplits = 10;
 bool mockExecution = true;
+bool genDescriptorCloud = false;
 
 bool armGoalAbort = false;
 GripperState gState = STATE_IDLE;
@@ -514,8 +515,11 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 			geometry_msgs::PoseStamped gp = it->pose;
 			gp.pose.position = it->point.position;
 			DEBUG_points_.push_back(gp);
+		}
 
-			std::string filename = id + "_descriptor";
+		if (genDescriptorCloud)
+		{
+			std::string filename = IO::getExperimentId() + "_" + id + "_descriptor";
 			GraspingUtils::generateGraspCloud(filename, *it);
 		}
 	}
@@ -558,7 +562,7 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 		for (size_t i = 0; i < ngrasps; i++)
 		{
 			ROS_INFO("*** processing grasp %zu of %zu ***", i + 1, ngrasps);
-			ROS_INFO("...attempt id: %s", IO::nextExperimentId(trackedObject).c_str());
+			ROS_INFO("...attempt id: %s", IO::getExperimentId().c_str());
 			ROS_DEBUG("grasp id: %s -- cluster label: %d", grasps[i].grasp.id.c_str(), grasps[i].label);
 
 
@@ -814,6 +818,7 @@ int main(int _argn, char **_argv)
 	graspPadding = Config::get()["grasper"]["graspPadding"].as<float>();
 	nsplits = Config::get()["grasper"]["angleSplits"].as<int>();
 	mockExecution = Config::get()["grasper"]["mockExecution"].as<bool>();
+	genDescriptorCloud = Config::get()["grasper"]["genDescriptorCloud"].as<bool>();
 
 	// Load the classifier if requested
 	usePredictions = Config::get()["grasper"]["usePredictions"].as<bool>();

@@ -464,7 +464,7 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 					axes.push_back(desc[band]->axis);
 
 				static long idx = 0;
-				std::string filename = "computed_descriptor_" + boost::lexical_cast<std::string>(idx++);
+				std::string filename = DEBUG_PREFIX "computed_descriptor_" + boost::lexical_cast<std::string>(idx++);
 				GraspingUtils::generateGraspCloud(filename,
 												  writtenCloud,
 												  dchParams->searchRadius,

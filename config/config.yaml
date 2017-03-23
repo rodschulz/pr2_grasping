@@ -96,9 +96,11 @@ grasper:
     angleSplits: 4
     # mocks the grasp routine without actually moving the robot
     mockExecution: false
+    # flag indicating if the descriptor cloud has to be generated
+    genDescriptorCloud: true
     # parameters regarding the use of predictions for the outcome of the grasping points
     predictions:
-        npredictions: 1 # number of predictions to produce
+        npredictions: 3 # number of predictions to produce
         classifier: config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
     ##### descriptor calculation params #####
     descriptor:
