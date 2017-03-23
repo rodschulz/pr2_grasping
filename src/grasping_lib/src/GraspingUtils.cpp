@@ -203,7 +203,8 @@ int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr
 	return target;
 }
 
-void GraspingUtils::generateGraspCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+void GraspingUtils::generateGraspCloud(const std::string &filename_,
+									   const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
 									   const DCHParams *dchParams_,
 									   const geometry_msgs::Pose &target_,
 									   const int nearest_,
@@ -269,7 +270,6 @@ void GraspingUtils::generateGraspCloud(const pcl::PointCloud<pcl::PointNormal>::
 	grasp->push_back(PointFactory::createPointXYZRGBNormal(x, y, z, 0, 0, 0, 0, COLOR_RED));
 
 
-	static long idx = 0;
 	std::string outputDir = PkgUtils::getOutputPath();
-	pcl::io::savePCDFileASCII(outputDir + DEBUG_PREFIX + boost::lexical_cast<std::string>(idx++) + "_grasp.pcd", *grasp);
+	pcl::io::savePCDFileASCII(outputDir + DEBUG_PREFIX + filename_ + CLOUD_FILE_EXTENSION, *grasp);
 }

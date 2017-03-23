@@ -71,7 +71,8 @@ public:
 								const geometry_msgs::Pose &target_);
 
 	/**************************************************/
-	static void generateGraspCloud(const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
+	static void generateGraspCloud(const std::string &filename_,
+								   const pcl::PointCloud<pcl::PointNormal>::Ptr &cloud_,
 								   const DCHParams *dchParams_,
 								   const geometry_msgs::Pose &target_,
 								   const int nearest_,

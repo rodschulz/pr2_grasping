@@ -428,7 +428,11 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 			// ROS_DEBUG_STREAM("" << response_);
 
 			if (debugEnabled_)
-				GraspingUtils::generateGraspCloud(writtenCloud, dchParams, request_.target, nearest, desc);
+			{
+				static long idx = 0;
+				std::string filename = "computed_descriptor_" + boost::lexical_cast<std::string>(idx++);
+				GraspingUtils::generateGraspCloud(filename, writtenCloud, dchParams, request_.target, nearest, desc);
+			}
 		}
 		else
 			ROS_WARN("Unable to compute required descriptor type (%s)", Params::descType[params->type].c_str());
