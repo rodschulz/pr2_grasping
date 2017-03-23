@@ -459,6 +459,8 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 			candidate.indexPoint = i;
 			candidate.indexAngle = j;
 			data.push_back(candidate);
+
+			ROS_DEBUG("candidate %3zu-%3zu", data.back().indexPoint, data.back().indexAngle);
 		}
 	}
 
@@ -483,16 +485,19 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		}
 
 		// Sort the predictions according to the score
-		ROS_DEBUG("Sorting %zu predictions", predictions.size());
+		ROS_INFO("Sorting %zu predictions", predictions.size());
 		std::sort(predictions.begin(), predictions.end(),
 				  boost::bind(&std::pair<size_t, float>::second, _1) > boost::bind(&std::pair<size_t, float>::second, _2));
 
 
 		if (debugEnabled_)
 		{
-			ROS_DEBUG("Sorted predictions:");
 			for (size_t i = 0; i < predictions.size(); i++)
-				ROS_DEBUG("\tindex: %3zu -- score: %.3f", predictions[i].first, predictions[i].second);
+				ROS_DEBUG("\tindex: %3zu -- score: %.3f // idx point: %3zu -- idx angle:%3zu",
+						  predictions[i].first,
+						  predictions[i].second,
+						  data[predictions[i].first].indexPoint,
+						  data[predictions[i].first].indexAngle);
 		}
 
 
@@ -502,7 +507,12 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		start = candidates.begin();
 		finish = candidates.end();
 
-		ROS_DEBUG("Selected %zu predictions", candidates.size());
+		if (debugEnabled_)
+		{
+			ROS_DEBUG("Selected %zu predictions", candidates.size());
+			for (size_t i = 0; i < candidates.size(); i++)
+				ROS_DEBUG("\tidx point: %3zu -- idx angle:%3zu", candidates[i].indexPoint, candidates[i].indexAngle);
+		}
 	}
 	else
 	{
@@ -513,7 +523,7 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 
 	// Finally, generate the grasping candidates
 	std::map<int, int> trackedPoints;
-	for (std::vector<CandidateData>::iterator it = start; start != finish; start++)
+	for (std::vector<CandidateData>::iterator it = start; it != finish; it++)
 	{
 		// Track the number of grasping points used
 		if (trackedPoints.find(it->indexPoint) == trackedPoints.end())
@@ -523,8 +533,9 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 		// Generate id and grasp
 		std::string id = GRASP_ID
 						 + boost::lexical_cast<std::string>(trackedPoints[it->indexPoint])
-						 + "_" + boost::lexical_cast<std::string>(it->indexPoint)
-						 + "_" + boost::lexical_cast<std::string>(it->indexAngle);
+						 + "_p" + boost::lexical_cast<std::string>(it->indexPoint)
+						 + "_a" + boost::lexical_cast<std::string>(it->indexAngle)
+						 + "_l" + boost::lexical_cast<std::string>(it->point.label);
 		moveit_msgs::Grasp grasp = genGrasp(id, side_, it->pose, OBJECT_TARGET, OBJECT_SUPPORT);
 		grasps.push_back(GraspData(grasp, it->descriptor, it->score, it->angle, it->point.label));
 		ROS_DEBUG("Producing grasp candidate '%s'", id.c_str());
@@ -532,16 +543,12 @@ std::vector<GraspData> genGraspData(const EffectorSide &side_,
 
 		if (debugEnabled_)
 		{
-			ROS_DEBUG("Generating grasping points array");
 			geometry_msgs::PoseStamped gp = it->pose;
 			gp.pose.position = it->point.position;
 			DEBUG_points_.push_back(gp);
 
-			ROS_DEBUG("Generating descriptor cloud");
 			std::string filename = id + "_descriptor";
 			GraspingUtils::generateGraspCloud(filename, *it);
-
-			ROS_DEBUG("DONE");
 		}
 	}
 
@@ -662,11 +669,6 @@ void graspingRoutine(moveit::planning_interface::PlanningSceneInterface *plannin
 				}
 				else
 					ROS_INFO("...attempt failed, skipping evaluation");
-
-
-				// pr2_grasping::DescriptorCalc desc;
-				// desc.request.target = grasps[i].grasp.grasp_pose.pose;
-				// ros::service::call("/pr2_grasping/descriptor_calculator", desc);
 
 
 				/********** Store the result **********/

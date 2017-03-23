@@ -207,13 +207,11 @@ int GraspingUtils::findNearestPoint(const pcl::PointCloud<pcl::PointNormal>::Ptr
 void GraspingUtils::generateGraspCloud(const std::string &filename_,
 									   const CandidateData &candiate_)
 {
-	ROS_DEBUG("Transforming cloud");
 	// Transform cloud type
 	pcl::PointCloud<pcl::PointNormal>::Ptr cloud(new pcl::PointCloud<pcl::PointNormal>());
 	pcl::fromROSMsg(candiate_.descriptor.cloud, *cloud);
 
 
-	ROS_DEBUG("Producing axes");
 	// Generate band axes
 	std::vector<Eigen::ParametrizedLine<float, 3> > axes;
 	for (size_t band = 0; band < candiate_.descriptor.bandAxes.size(); band++)
@@ -224,7 +222,6 @@ void GraspingUtils::generateGraspCloud(const std::string &filename_,
 	}
 
 
-	ROS_DEBUG("Calling method");
 	// Generate the cloud
 	GraspingUtils::generateGraspCloud(filename_,
 									  cloud,
