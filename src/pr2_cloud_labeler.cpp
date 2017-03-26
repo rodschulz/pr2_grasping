@@ -73,6 +73,7 @@ std::string outputDir;
 
 /***** Debug variables *****/
 ros::Publisher limitsPub, planePub;
+bool genCloudDCH = false;
 
 
 /**************************************************/
@@ -457,7 +458,7 @@ bool computeDescriptor(pr2_grasping::DescriptorCalc::Request &request_,
 					response_.descriptor[band * bandSize + seq].data = desc[band]->descriptor[seq];
 
 
-			if (debugEnabled_)
+			if (debugEnabled_ && genCloudDCH)
 			{
 				std::vector<Eigen::ParametrizedLine<float, 3> > axes;
 				for (size_t band = 0; band < desc.size(); band++)
@@ -509,6 +510,7 @@ int main(int argn_, char **argv_)
 	float clippingPlaneZ = Config::get()["labeler"]["clippingPlaneZ"].as<float>();
 	bool writeClouds = Config::get()["labeler"]["writeClouds"].as<bool>();
 	std::string topicName = Config::get()["labeler"]["pointcloudTopic"].as<std::string>();
+	genCloudDCH = Config::get()["labeler"]["genCloudDCH"].as<bool>();
 
 
 	/********** Load the codebook and prepare the classifier **********/

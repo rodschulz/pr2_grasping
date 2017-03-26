@@ -1,4 +1,3 @@
----
 ########## nodes params ##########
 
 # flags to enable/disable debug
@@ -23,8 +22,8 @@ setup:
     displacementThreshold: 1.0
     headTarget: {x: 0.9, y: 0.0, z: 0.5}
     armsPosition:
-      right: {x: 0.0, y: -0.7, z: 0.9}
-      left: {x: 0.0, y: 0.7, z: 0.9}
+        right: {x: 0.0, y: -0.7, z: 0.9}
+        left: {x: 0.0, y: 0.7, z: 0.9}
 
     # objects ignored in the reset process
     ignore: [ground_plane, pr2]
@@ -43,33 +42,35 @@ labeler:
     clippingPlaneZ: 0.48
     # indicates if the object's cloud has to be stored
     writeClouds: true
+    # flag to enable the generation of a cloud showing the DCH computation
+    genCloudDCH: false
     ##### descriptor calculation params #####
     descriptor:
         type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
         DCH:
-          searchRadius: 0.03 # mts
-          bandNumber: 8
-          bandWidth: 0.005 # mts
-          bidirectional: false
-          useProjection: false
-          binNumber: 4
-          stat: 'mean' # mean, median, hist10, hist20, hb20, hb10
+            searchRadius: 0.03 # mts
+            bandNumber: 8
+            bandWidth: 0.005 # mts
+            bidirectional: false
+            useProjection: false
+            binNumber: 4
+            stat: mean # mean, median, hist10, hist20, hb20, hb10
         SHOT:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         USC:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         PFH:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         FPFH:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         ROPS:
-          searchRadius: 0.035 # mts
-          partitionsNumber: 5
-          rotationsNumber: 3
-          supportRadius: 0.025
+            searchRadius: 0.035 # mts
+            partitionsNumber: 5
+            rotationsNumber: 3
+            supportRadius: 0.025
         SpinImage:
-          searchRadius: 0.035 # mts
-          imageWidth: 8
+            searchRadius: 0.035 # mts
+            imageWidth: 8
 
 
 ##### grasper node options #####
@@ -96,39 +97,39 @@ grasper:
     angleSplits: 4
     # mocks the grasp routine without actually moving the robot
     mockExecution: false
-    # flag indicating if the descriptor cloud has to be generated
-    genDescriptorCloud: true
+    # flag to enable the generation of a cloud showing the DCH computation
+    genCloudDCH: true
     # parameters regarding the use of predictions for the outcome of the grasping points
     predictions:
         npredictions: 3 # number of predictions to produce
-        classifier: config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
+        classifier: ./config/classifiers/DCH_72_split4_beer_drill_svm_auto.yaml
     ##### descriptor calculation params #####
     descriptor:
         type: DCH # DCH, SHOT, USC, PFH, FPFH, ROPS, SpinImage
         DCH:
-          searchRadius: 0.03 # mts
-          bandNumber: 8
-          bandWidth: 0.005 # mts
-          bidirectional: false
-          useProjection: false
-          binNumber: 3 # 3 bins of 0.01 mts
-          stat: 'hist20' # mean, median, hist10, hist20, hb20, hb10
+            searchRadius: 0.03 # mts
+            bandNumber: 8
+            bandWidth: 0.005 # mts
+            bidirectional: false
+            useProjection: false
+            binNumber: 3 # 3 bins of 0.01 mts
+            stat: hist20 # mean, median, hist10, hist20, hb20, hb10
         SHOT:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         USC:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         PFH:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         FPFH:
-          searchRadius: 0.035 # mts
+            searchRadius: 0.035 # mts
         ROPS:
-          searchRadius: 0.035 # mts
-          partitionsNumber: 5
-          rotationsNumber: 3
-          supportRadius: 0.025
+            searchRadius: 0.035 # mts
+            partitionsNumber: 5
+            rotationsNumber: 3
+            supportRadius: 0.025
         SpinImage:
-          searchRadius: 0.035 # mts
-          imageWidth: 8
+            searchRadius: 0.035 # mts
+            imageWidth: 8
 
 
 ##### evaluator node options #####
@@ -143,7 +144,7 @@ evaluator:
     # object position for evaluation of grasping attempt (relative to 'base_footprint')
     position: {x: 0.45, y: 0, z: 0.8}
     # point cloud input topic
-    pointcloudTopic: /move_group/filtered_cloud 
+    pointcloudTopic: /move_group/filtered_cloud
 
 
 ###################################################
@@ -159,4 +160,3 @@ cloudSmoothing:
     useSmoothing: true
     sigma: 4
     radius: 0.005
-...
