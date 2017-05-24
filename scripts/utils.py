@@ -81,6 +81,9 @@ def getPalette(paletteName_):
 	elif paletteName_.lower() == 'set3':
 		return plt.cm.Set3(np.linspace(0, 1, 12))
 
+	elif paletteName_.lower() == 'paired':
+		return plt.cm.Paired(np.linspace(0, 1, 6))
+
 	else:
 		return plt.cm.Set3(np.linspace(0, 1, 12))
 
@@ -132,9 +135,9 @@ def basePlot(title_, data_, labels_, palette_):
 		ax.scatter3D(xclass, yclass, zclass, c=col, s=10, linewidth='0', alpha=1.0)
 
 	av = np.average(data_, axis=0)
-	d = 0.2
+	d = 0.12
 
-	ax.view_init(elev=30, azim=-15)
+	ax.view_init(elev=30, azim=-190)
 	ax.set_xlabel('x')
 	ax.set_ylabel('y')
 	ax.set_zlabel('z') 

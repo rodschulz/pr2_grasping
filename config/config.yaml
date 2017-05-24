@@ -80,7 +80,7 @@ analyzer:
     # number of points in a neighborhood for a point to be considered core point
     minPoints: 30
     # color palette used for the debug graph generation
-    palette: Set3 # Options are: Spectral, Set1, Set2, Set3
+    palette: Set1 # Options are: Spectral, Set1, Set2, Set3, Paired
 
 
 ##### grasper node options #####
